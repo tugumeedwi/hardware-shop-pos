@@ -1,0 +1,22 @@
+@import "tailwindcss";
+
+/* Print styles */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .receipt-container, .receipt-container * {
+    visibility: visible;
+  }
+  .receipt-container {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+  }
+  .print\:hidden {
+    display: none !important;
+  }
+}

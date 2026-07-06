@@ -1,0 +1,185 @@
+import { useState, useEffect } from 'react'
+import { supabase } from '../api/supabaseClient'
+import Receipt from '../components/Receipt'
+import toast from 'react-hot-toast'
+
+export default function SalesHistory() {
+  const [sales, setSales] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [viewReceiptId, setViewReceiptId] = useState(null)
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
+  const [paymentFilter, setPaymentFilter] = useState('all')
+  const [customerFilter, setCustomerFilter] = useState('')
+  const [totals, setTotals] = useState({ total: 0, cash: 0, mobile_money: 0, credit: 0 })
+
+  const fetchSales = async () => {
+    setLoading(true)
+    let query = supabase
+      .from('sales')
+      .select('*, customers(name, phone)')
+      .eq('type', 'pos')
+      .order('created_at', { ascending: false })
+
+    if (dateFrom) query = query.gte('created_at', dateFrom + 'T00:00:00')
+    if (dateTo) query = query.lte('created_at', dateTo + 'T23:59:59')
+    if (paymentFilter !== 'all') query = query.eq('payment_method', paymentFilter)
+
+    const { data } = await query
+    let filtered = data || []
+    if (customerFilter) {
+      const term = customerFilter.toLowerCase()
+      filtered = filtered.filter(s =>
+        s.customers?.name?.toLowerCase().includes(term) ||
+        s.customers?.phone?.includes(term) ||
+        s.id.slice(0, 8).includes(term)
+      )
+    }
+    setSales(filtered)
+
+    const all = data || []
+    setTotals({
+      total: all.reduce((sum, s) => sum + s.total_amount, 0),
+      cash: all.filter(s => s.payment_method === 'cash').reduce((sum, s) => sum + s.total_amount, 0),
+      mobile_money: all.filter(s => s.payment_method === 'mobile_money').reduce((sum, s) => sum + s.total_amount, 0),
+      credit: all.filter(s => s.payment_method === 'credit').reduce((sum, s) => sum + s.total_amount, 0)
+    })
+    setLoading(false)
+  }
+
+  useEffect(() => { fetchSales() }, [dateFrom, dateTo, paymentFilter])
+  useEffect(() => {
+    const handler = () => fetchSales()
+    window.addEventListener('syncCompleted', handler)
+    return () => window.removeEventListener('syncCompleted', handler)
+  }, [])
+
+  const applyCustomerFilter = () => fetchSales()
+
+  const exportCSV = () => {
+    if (sales.length === 0) return toast.error('No data to export')
+    const headers = ['Date', 'Customer', 'Phone', 'Payment', 'Total', 'Status']
+    const rows = sales.map(s => [
+      new Date(s.created_at).toLocaleString(),
+      s.customers?.name || 'Walk-in',
+      s.customers?.phone || '',
+      s.payment_method,
+      s.total_amount.toFixed(2),
+      s.status
+    ])
+    const csvContent = [headers, ...rows].map(row => row.join(',')).join('\n')
+    const blob = new Blob([csvContent], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `sales_${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+    toast.success('CSV exported')
+  }
+
+  return (
+    <div className="min-h-screen bg-zinc-50 p-4 font-sans">
+      <h1 className="text-2xl font-bold text-zinc-800 mb-6">Sales History</h1>
+
+      {/* Filters */}
+      <div className="bg-white border border-zinc-200 rounded-2xl shadow-sm p-5 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+          <div>
+            <label className="text-xs font-medium text-zinc-500">From</label>
+            <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)}
+              className="w-full border border-zinc-300 rounded-xl px-3 py-2.5 mt-1 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400" />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-zinc-500">To</label>
+            <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)}
+              className="w-full border border-zinc-300 rounded-xl px-3 py-2.5 mt-1 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400" />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-zinc-500">Payment</label>
+            <select value={paymentFilter} onChange={(e) => setPaymentFilter(e.target.value)}
+              className="w-full border border-zinc-300 rounded-xl px-3 py-2.5 mt-1 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400">
+              <option value="all">All</option>
+              <option value="cash">Cash</option>
+              <option value="mobile_money">Mobile Money</option>
+              <option value="credit">Credit</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-zinc-500">Customer / Sale ID</label>
+            <div className="flex gap-2 mt-1">
+              <input type="text" value={customerFilter} onChange={(e) => setCustomerFilter(e.target.value)}
+                placeholder="Name, phone, ID" className="flex-1 border border-zinc-300 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400" />
+              <button onClick={applyCustomerFilter} className="bg-zinc-700 hover:bg-zinc-800 text-white px-4 py-2.5 rounded-xl font-medium transition-colors">Filter</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Summary cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div className="bg-white border border-zinc-200 rounded-2xl shadow-sm p-4 text-center">
+          <span className="text-sm text-zinc-500">Total Sales</span>
+          <p className="text-xl font-bold text-zinc-800">{totals.total.toFixed(2)}</p>
+        </div>
+        <div className="bg-white border border-zinc-200 rounded-2xl shadow-sm p-4 text-center">
+          <span className="text-sm text-zinc-500">Cash</span>
+          <p className="text-xl font-bold text-emerald-600">{totals.cash.toFixed(2)}</p>
+        </div>
+        <div className="bg-white border border-zinc-200 rounded-2xl shadow-sm p-4 text-center">
+          <span className="text-sm text-zinc-500">Mobile Money</span>
+          <p className="text-xl font-bold text-blue-600">{totals.mobile_money.toFixed(2)}</p>
+        </div>
+        <div className="bg-white border border-zinc-200 rounded-2xl shadow-sm p-4 text-center">
+          <span className="text-sm text-zinc-500">Credit</span>
+          <p className="text-xl font-bold text-red-600">{totals.credit.toFixed(2)}</p>
+        </div>
+      </div>
+
+      {/* Sales table */}
+      <div className="bg-white border border-zinc-200 rounded-2xl shadow-sm overflow-hidden mb-6">
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead className="bg-zinc-50 border-b border-zinc-200">
+              <tr>
+                <th className="px-4 py-3 text-left font-medium text-zinc-600">Date</th>
+                <th className="px-4 py-3 text-left font-medium text-zinc-600">Customer</th>
+                <th className="px-4 py-3 text-left font-medium text-zinc-600">Payment</th>
+                <th className="px-4 py-3 text-right font-medium text-zinc-600">Total</th>
+                <th className="px-4 py-3 text-center font-medium text-zinc-600">Receipt</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-100">
+              {sales.map(s => (
+                <tr key={s.id} className="hover:bg-zinc-50 transition-colors">
+                  <td className="px-4 py-3 text-zinc-700">{new Date(s.created_at).toLocaleString()}</td>
+                  <td className="px-4 py-3 font-medium text-zinc-800">{s.customers?.name || 'Walk-in'}</td>
+                  <td className="px-4 py-3 text-zinc-600 capitalize">{s.payment_method?.replace('_', ' ')}</td>
+                  <td className="px-4 py-3 text-right text-zinc-700">{s.total_amount.toFixed(2)}</td>
+                  <td className="px-4 py-3 text-center">
+                    <button onClick={() => setViewReceiptId(s.id)} className="text-emerald-600 hover:text-emerald-700 font-medium transition-colors">View</button>
+                  </td>
+                </tr>
+              ))}
+              {sales.length === 0 && !loading && (
+                <tr><td colSpan={5} className="px-4 py-8 text-center text-zinc-400">No sales found.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <button onClick={exportCSV} className="bg-zinc-200 hover:bg-zinc-300 text-zinc-700 font-medium py-2.5 px-5 rounded-xl transition-colors">
+        Export CSV
+      </button>
+
+      {viewReceiptId && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl p-6">
+            <Receipt saleId={viewReceiptId} onClose={() => setViewReceiptId(null)} />
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
