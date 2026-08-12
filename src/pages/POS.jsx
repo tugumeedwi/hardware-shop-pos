@@ -6,6 +6,7 @@ import Receipt from '../components/Receipt'
 import toast from 'react-hot-toast'
 import { useRealtimeSubscription } from '../hooks/useRealtime'
 import { normalisePhone } from '../utils/phoneUtils'
+import { queueTaxInvoiceAfterSale } from '../utils/syncManager'
 
 export default function POS() {
   const { profile } = useAuth()
@@ -284,6 +285,7 @@ export default function POS() {
         }
 
         setLastSaleId(saleId)
+        await queueTaxInvoiceAfterSale(saleId)
         if (localStorage.getItem('autoPrintBrowser') === 'true') {
           setTimeout(() => window.print(), 500)
         }

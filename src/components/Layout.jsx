@@ -37,6 +37,7 @@ export default function Layout({ children }) {
               <Link to="/conflicts" className="text-gray-700 hover:text-blue-600">Conflicts</Link>
 <Link to="/activity" className="text-zinc-700 hover:text-zinc-900 font-medium transition-colors">Activity</Link>
               <Link to="/users" className="text-gray-700 hover:text-blue-600">Users</Link>
+              <Link to="/tax-settings" className="text-gray-700 hover:text-blue-600">Tax</Link>
               <Link to="/settings" className="text-gray-700 hover:text-blue-600">Settings</Link>
             </>
           )}

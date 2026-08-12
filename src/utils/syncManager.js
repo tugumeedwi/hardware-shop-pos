@@ -3,6 +3,50 @@ import db from '../db/localDatabase'
 
 let syncInProgress = false
 
+/**
+ * After a sale is confirmed on the server, queue a URA/FDN tax invoice when
+ * the active tenant has e-invoicing enabled. Uses the caller's JWT so RLS
+ * scopes the tenants lookup and the tax_invoices insert to the right tenant.
+ */
+export async function queueTaxInvoiceAfterSale(saleId) {
+  try {
+    const { data: { user } } = await supabase.auth.getUser()
+    const tenantId = user?.user_metadata?.tenant_id || user?.app_metadata?.tenant_id
+    if (!tenantId) return false
+
+    const { data: tenant } = await supabase
+      .from('tenants')
+      .select('tax_enabled, tax_tin, tax_provider, tax_config')
+      .eq('id', tenantId)
+      .single()
+
+    if (!tenant?.tax_enabled) return false
+
+    const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, '')
+    const invoiceNumber = `INV-${datePart}-${String(saleId || '').slice(0, 8).toUpperCase()}`
+
+    const { error } = await supabase.from('tax_invoices').insert({
+      sale_id: saleId,
+      invoice_number: invoiceNumber,
+      status: 'pending',
+      request_body: {
+        created_from: 'pos',
+        provider: tenant.tax_provider ?? 'ura_fdn',
+        auto_queued_at: new Date().toISOString()
+      }
+    })
+
+    if (error) {
+      console.warn('Failed to queue tax invoice:', error.message)
+      return false
+    }
+    return true
+  } catch (err) {
+    console.warn('queueTaxInvoiceAfterSale error:', err.message)
+    return false
+  }
+}
+
 export async function processSyncQueue() {
   if (syncInProgress) return
   syncInProgress = true
@@ -226,6 +270,11 @@ async function syncPendingSale(saleData) {
         notes: 'POS credit sale (synced from offline)'
       })
     }
+  }
+
+  // 6b. Queue a tax invoice for this sale if e-invoicing is enabled
+  if (sale?.id) {
+    await queueTaxInvoiceAfterSale(sale.id)
   }
 
   // Remove from pendingSales
