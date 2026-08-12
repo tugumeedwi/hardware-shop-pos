@@ -9,7 +9,13 @@ import { normalisePhone } from '../utils/phoneUtils'
 import { queueTaxInvoiceAfterSale } from '../utils/syncManager'
 
 export default function POS() {
-  const { profile } = useAuth()
+  const { profile, tenant } = useAuth()
+  const businessType = tenant?.business_type || 'hardware'
+  // Phone products are detected from their vertical attributes so a phone-shop
+  // product works correctly even if the tenant type is not set to 'phones'.
+  const isPhoneProduct = (product) =>
+    businessType === 'phones' ||
+    !!(product.attributes && (product.attributes.imei || product.attributes.color || product.attributes.storage || product.attributes.condition))
   const [products, setProducts] = useState([])
   const [cart, setCart] = useState([])
   const [searchTerm, setSearchTerm] = useState('')
@@ -54,15 +60,29 @@ export default function POS() {
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
 
       if (e.key === 'Enter') {
-        const sku = scannerBuffer.trim()
+        const code = scannerBuffer.trim()
         setScannerBuffer('')
-        if (sku) {
-          const product = products.find(p => p.sku === sku)
-          if (product) {
-            addToCart(product)
-            toast.success(`Added ${product.name}`)
+        if (code) {
+          // 15-17 digit numeric scan -> IMEI / serial for a phone product
+          if (/^\d{15,17}$/.test(code)) {
+            const phone = products.find(p => {
+              const attrs = p.attributes || {}
+              return attrs.imei === code || attrs.IMEI === code
+            })
+            if (phone) {
+              addToCart(phone, { sellingUnit: 'piece', unitPrice: phone.price_per_piece })
+              toast.success(`Added ${phone.name}`)
+            } else {
+              toast.error('Phone with IMEI not found')
+            }
           } else {
-            toast.error(`No product with SKU ${sku}`)
+            const product = products.find(p => p.sku === code)
+            if (product) {
+              addToCart(product)
+              toast.success(`Added ${product.name}`)
+            } else {
+              toast.error(`No product with SKU ${code}`)
+            }
           }
         }
         e.preventDefault()
@@ -120,18 +140,20 @@ export default function POS() {
   )
 
   // ---- Cart handlers ----
-  const addToCart = (product) => {
+  const addToCart = (product, overrides = {}) => {
     const activeMethods = product.active_pricing_methods
     if (!activeMethods || activeMethods.length === 0) {
       toast.error('No selling method enabled')
       return
     }
-    const defaultUnit = activeMethods[0]
-    let unitPrice = 0
-    if (defaultUnit === 'piece') unitPrice = product.price_per_piece
-    else if (defaultUnit === 'box') unitPrice = product.price_per_box
-    else if (defaultUnit === 'sqm') unitPrice = product.price_per_sqm
-    else if (defaultUnit === 'kg') unitPrice = product.price_per_kg
+    const defaultUnit = overrides.sellingUnit || activeMethods[0]
+    let unitPrice = overrides.unitPrice
+    if (unitPrice === undefined) {
+      if (defaultUnit === 'piece') unitPrice = product.price_per_piece
+      else if (defaultUnit === 'box') unitPrice = product.price_per_box
+      else if (defaultUnit === 'sqm') unitPrice = product.price_per_sqm
+      else if (defaultUnit === 'kg') unitPrice = product.price_per_kg
+    }
 
     setCart([...cart, {
       product,
@@ -370,6 +392,13 @@ export default function POS() {
                 className="group relative bg-white border border-zinc-200 rounded-xl p-4 text-left shadow-sm hover:shadow-md hover:scale-[1.02] active:scale-100 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-emerald-400"
               >
                 <div className="font-semibold text-zinc-800 text-sm leading-tight">{product.name}</div>
+                {product.attributes?.imei && (
+                  <div className="mt-1 flex items-center gap-1">
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-zinc-100 text-zinc-600 truncate max-w-full">
+                      IMEI: {product.attributes.imei}
+                    </span>
+                  </div>
+                )}
                 <div className="flex items-center justify-between mt-1">
                   <span className="text-xs text-zinc-500">Stock: {product.stock_quantity}</span>
                   {product.stock_quantity <= (product.low_stock_threshold || 10) && (
@@ -402,16 +431,23 @@ export default function POS() {
                 <div key={index} className="flex items-center justify-between bg-zinc-50 rounded-xl p-3 text-sm">
                   <div className="flex-1">
                     <p className="font-medium text-zinc-700 truncate">{item.product.name}</p>
+                    {item.product.attributes?.imei && (
+                      <p className="text-[10px] text-zinc-400 truncate">IMEI: {item.product.attributes.imei}</p>
+                    )}
                     <div className="flex items-center gap-2 mt-1">
-                      <select
-                        value={item.sellingUnit}
-                        onChange={(e) => updateCartItem(index, 'sellingUnit', e.target.value)}
-                        className="text-xs border border-zinc-300 rounded-lg px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-emerald-400"
-                      >
-                        {item.product.active_pricing_methods.map(unit => (
-                          <option key={unit} value={unit}>{unit}</option>
-                        ))}
-                      </select>
+                      {isPhoneProduct(item.product) ? (
+                        <span className="text-xs font-semibold text-zinc-500 bg-white border border-zinc-200 rounded-lg px-2 py-1">piece</span>
+                      ) : (
+                        <select
+                          value={item.sellingUnit}
+                          onChange={(e) => updateCartItem(index, 'sellingUnit', e.target.value)}
+                          className="text-xs border border-zinc-300 rounded-lg px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                        >
+                          {item.product.active_pricing_methods.map(unit => (
+                            <option key={unit} value={unit}>{unit}</option>
+                          ))}
+                        </select>
+                      )}
                       <input
                         type="number"
                         min="1"
