@@ -21,8 +21,14 @@ export default function SalesHistory() {
       .eq('type', 'pos')
       .order('created_at', { ascending: false })
 
-    if (dateFrom) query = query.gte('created_at', dateFrom + 'T00:00:00')
-    if (dateTo) query = query.lte('created_at', dateTo + 'T23:59:59')
+    if (dateFrom) {
+      // Convert the local calendar date to an absolute timestamp so the
+      // comparison is tz-correct regardless of the DB session timezone.
+      query = query.gte('created_at', new Date(dateFrom + 'T00:00:00').toISOString())
+    }
+    if (dateTo) {
+      query = query.lte('created_at', new Date(dateTo + 'T23:59:59.999').toISOString())
+    }
     if (paymentFilter !== 'all') query = query.eq('payment_method', paymentFilter)
 
     const { data } = await query
@@ -37,12 +43,13 @@ export default function SalesHistory() {
     }
     setSales(filtered)
 
-    const all = data || []
+    // Totals must match what the table actually shows, so compute them on the
+    // customer-filtered set (date/payment filters already applied server-side).
     setTotals({
-      total: all.reduce((sum, s) => sum + s.total_amount, 0),
-      cash: all.filter(s => s.payment_method === 'cash').reduce((sum, s) => sum + s.total_amount, 0),
-      mobile_money: all.filter(s => s.payment_method === 'mobile_money').reduce((sum, s) => sum + s.total_amount, 0),
-      credit: all.filter(s => s.payment_method === 'credit').reduce((sum, s) => sum + s.total_amount, 0)
+      total: filtered.reduce((sum, s) => sum + (s.total_amount || 0), 0),
+      cash: filtered.filter(s => s.payment_method === 'cash').reduce((sum, s) => sum + (s.total_amount || 0), 0),
+      mobile_money: filtered.filter(s => s.payment_method === 'mobile_money').reduce((sum, s) => sum + (s.total_amount || 0), 0),
+      credit: filtered.filter(s => s.payment_method === 'credit').reduce((sum, s) => sum + (s.total_amount || 0), 0)
     })
     setLoading(false)
   }
@@ -56,6 +63,11 @@ export default function SalesHistory() {
 
   const applyCustomerFilter = () => fetchSales()
 
+  const csvEscape = (value) => {
+    const str = String(value ?? '')
+    return /[",\n]/.test(str) ? '"' + str.replace(/"/g, '""') + '"' : str
+  }
+
   const exportCSV = () => {
     if (sales.length === 0) return toast.error('No data to export')
     const headers = ['Date', 'Customer', 'Phone', 'Payment', 'Total', 'Status']
@@ -67,7 +79,7 @@ export default function SalesHistory() {
       s.total_amount.toFixed(2),
       s.status
     ])
-    const csvContent = [headers, ...rows].map(row => row.join(',')).join('\n')
+    const csvContent = [headers, ...rows].map(row => row.map(csvEscape).join(',')).join('\n')
     const blob = new Blob([csvContent], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')

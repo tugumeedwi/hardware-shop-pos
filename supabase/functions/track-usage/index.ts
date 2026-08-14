@@ -10,37 +10,11 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS'
 }
 
-const DEFAULT_MONTHLY_LIMIT = 2_000_000 // fallback when no plan maps
-
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     status
   })
-}
-
-async function getPlanLimit(supabase, planId) {
-  const { data: plans } = await supabase.from('plans').select('id, stripe_price_id, monthly_token_limit')
-  const match = (plans ?? []).find(p => p.id === planId || (planId && p.stripe_price_id === planId))
-  return match?.monthly_token_limit ?? DEFAULT_MONTHLY_LIMIT
-}
-
-async function sumMonth(supabase, tenantId) {
-  const monthStart = `${new Date().toISOString().slice(0, 7)}-01`
-  const { data: rows } = await supabase
-    .from('usage_records')
-    .select('tokens_in, tokens_out, cost')
-    .eq('tenant_id', tenantId)
-    .gte('date', monthStart)
-
-  const sum = (rows ?? []).reduce(
-    (acc, r) => ({
-      tokens: acc.tokens + (r.tokens_in ?? 0) + (r.tokens_out ?? 0),
-      cost: acc.cost + (r.cost ?? 0)
-    }),
-    { tokens: 0, cost: 0 }
-  )
-  return sum
 }
 
 Deno.serve(async (req) => {
@@ -71,59 +45,34 @@ Deno.serve(async (req) => {
   if (context.error || !context.tenantId) {
     return json({ success: false, error: context.error || 'Not authorized' }, 401)
   }
-  const tenantId = context.tenantId
 
-  const { data: tenant } = await supabase.from('tenants').select('plan_id').eq('id', tenantId).single()
-  const limit = await getPlanLimit(supabase, tenant?.plan_id)
+  // The tenant-scoped RPC needs the caller's tenant_id in the JWT. Service
+  // role has none, so invoke the RPC as the authenticated user by forwarding
+  // the caller's Authorization header.
+  const userSupabase = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY') ?? '', {
+    global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } }
+  })
 
-  // Project the month total BEFORE writing so a single over-limit request is
-  // rejected outright (no extra cost locked against the tenant).
-  const current = await sumMonth(supabase, tenantId)
-  const projected = current.tokens + tokensIn + tokensOut
+  const { data, error } = await userSupabase.rpc('track_usage', {
+    p_tokens_in: tokensIn,
+    p_tokens_out: tokensOut,
+    p_cost: cost
+  })
 
-  if (projected > limit) {
+  if (error) {
     return json({
       success: false,
-      error: 'Monthly token limit exceeded',
-      allowed: false,
-      limit,
-      used: current.tokens,
-      projected
-    }, 402)
-  }
-
-  const today = new Date().toISOString().slice(0, 10)
-  const { data: existing } = await supabase
-    .from('usage_records')
-    .select('id, tokens_in, tokens_out, cost')
-    .eq('tenant_id', tenantId)
-    .eq('date', today)
-    .maybeSingle()
-
-  if (existing?.id) {
-    await supabase
-      .from('usage_records')
-      .update({
-        tokens_in: (existing.tokens_in ?? 0) + tokensIn,
-        tokens_out: (existing.tokens_out ?? 0) + tokensOut,
-        cost: ((existing.cost ?? 0) + cost).toFixed(4)
-      })
-      .eq('id', existing.id)
-  } else {
-    await supabase.from('usage_records').insert({
-      tenant_id: tenantId,
-      date: today,
-      tokens_in: tokensIn,
-      tokens_out: tokensOut,
-      cost: cost.toFixed(4)
-    })
+      error: error.message,
+      allowed: false
+    }, error.message.includes('limit') || error.message.includes('Usage') ? 402 : 500)
   }
 
   return json({
     success: true,
-    allowed: true,
-    limit,
-    used: projected,
-    remaining: Math.max(0, limit - projected)
-  })
+    allowed: data?.allowed !== false,
+    limit: data?.limit,
+    used: data?.used,
+    projected: data?.projected ?? data?.used,
+    remaining: data?.remaining
+  }, data?.allowed === false ? 402 : 200)
 })

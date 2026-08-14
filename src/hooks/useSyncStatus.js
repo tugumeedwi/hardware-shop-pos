@@ -13,8 +13,13 @@ export function useSyncStatus() {
     refresh()
     // Refresh when coming online (after sync manager processes)
     const handleOnline = () => { setTimeout(refresh, 2000) } // wait for sync to finish
+    const handleSyncCompleted = () => { refresh() }
     window.addEventListener('online', handleOnline)
-    return () => window.removeEventListener('online', handleOnline)
+    window.addEventListener('syncCompleted', handleSyncCompleted)
+    return () => {
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('syncCompleted', handleSyncCompleted)
+    }
   }, [])
 
   // Also expose a manual refresh function

@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { Html5Qrcode } from 'html5-qrcode'
 import { supabase } from '../api/supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import db from '../db/localDatabase'
@@ -31,9 +32,53 @@ export default function POS() {
   const [lastSaleId, setLastSaleId] = useState(null)
   const [processing, setProcessing] = useState(false)
 
-  // Barcode scanner (global keydown, no focus stealing)
-  const [scannerBuffer, setScannerBuffer] = useState('')
+  // Barcode/IMEI scanner (USB keyboard wedge + mobile camera).
+  // The keyboard handler buffers keystrokes until Enter; the camera handler
+  // decodes QR/barcodes in real time. Both funnel into handleScannedText().
+  const [scannerActive, setScannerActive] = useState(false)
+  const [cameraOpen, setCameraOpen] = useState(false)
+  const scannerRef = useRef(null)
+  const cameraRegionId = useState(() => `qr-camera-${Math.random().toString(36).slice(2)}`)[0]
   const lowStockCount = products.filter(p => p.stock_quantity <= (p.low_stock_threshold || 10)).length
+
+  // Single entry point for a decoded scan: 15-17 digit numeric -> IMEI of a
+  // phone product; otherwise match by SKU. Clears the keyboard buffer on use.
+  // Kept as a plain function (recreated each render) so it always closes over
+  // the latest `products` and `addToCart`/`cart`.
+  const handleScannedText = (raw) => {
+    const text = String(raw || '').trim()
+    scannerRef.current = ''
+    if (!text) return
+
+    if (/^\d{15,17}$/.test(text)) {
+      const phone = products.find(p => {
+        const attrs = p.attributes || {}
+        return attrs.imei === text || attrs.IMEI === text
+      })
+      if (phone) {
+        addToCart(phone, { sellingUnit: 'piece', unitPrice: phone.price_per_piece })
+        toast.success(`Added ${phone.name}`)
+      } else {
+        toast.error('Phone with IMEI not found')
+      }
+    } else {
+      const product = products.find(p => p.sku === text)
+      if (product) {
+        addToCart(product)
+        toast.success(`Added ${product.name}`)
+      } else {
+        toast.error(`No product with SKU ${text}`)
+      }
+    }
+    setScannerActive(false)
+  }
+
+  // Keep the latest handler in a ref so the single global keydown listener and
+  // the camera callback never go stale without re-subscribing on every render.
+  const scanHandlerRef = useRef(handleScannedText)
+  useEffect(() => {
+    scanHandlerRef.current = handleScannedText
+  })
 
   // ---- network listeners ----
   useEffect(() => {
@@ -53,46 +98,70 @@ export default function POS() {
     return () => window.removeEventListener('syncCompleted', handler)
   }, [])
 
-  // Barcode scanner via global keydown
+  // Barcode scanner via global keydown (USB wedge). Buffers keystrokes and
+  // only handles a scan once the device sends Enter, using the ref so the
+  // listener never needs re-subscribing.
   useEffect(() => {
     const handleKeyDown = (e) => {
       const tag = document.activeElement?.tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
 
       if (e.key === 'Enter') {
-        const code = scannerBuffer.trim()
-        setScannerBuffer('')
-        if (code) {
-          // 15-17 digit numeric scan -> IMEI / serial for a phone product
-          if (/^\d{15,17}$/.test(code)) {
-            const phone = products.find(p => {
-              const attrs = p.attributes || {}
-              return attrs.imei === code || attrs.IMEI === code
-            })
-            if (phone) {
-              addToCart(phone, { sellingUnit: 'piece', unitPrice: phone.price_per_piece })
-              toast.success(`Added ${phone.name}`)
-            } else {
-              toast.error('Phone with IMEI not found')
-            }
-          } else {
-            const product = products.find(p => p.sku === code)
-            if (product) {
-              addToCart(product)
-              toast.success(`Added ${product.name}`)
-            } else {
-              toast.error(`No product with SKU ${code}`)
-            }
-          }
-        }
+        const code = scannerRef.current.trim()
+        scannerRef.current = ''
         e.preventDefault()
+        if (code) scanHandlerRef.current(code)
       } else if (e.key.length === 1) {
-        setScannerBuffer(prev => prev + e.key)
+        scannerRef.current += e.key
+        setScannerActive(true)
       }
     }
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [scannerBuffer, products])
+  }, [])
+
+  // Mobile camera scanner: show the camera view on demand, decode a barcode /
+  // QR once, add it to the cart and stop the camera immediately after.
+  useEffect(() => {
+    if (!cameraOpen) return
+
+    let cancelled = false
+    let scanner = null
+    let timer = null
+
+    const start = async () => {
+      try {
+        scanner = new Html5Qrcode(cameraRegionId.current)
+        await scanner.start(
+          { facingMode: 'environment' },
+          { fps: 10, qrbox: { width: 260, height: 160 } },
+          (decodedText) => {
+            if (!cancelled) {
+              scanner?.stop().catch(() => {})
+              setCameraOpen(false)
+              setScannerActive(false)
+              scanHandlerRef.current(decodedText)
+            }
+          },
+          () => {} // per-frame decode miss: ignore
+        )
+      } catch (err) {
+        console.error('Camera start failed:', err)
+        setCameraOpen(false)
+        toast.error('Could not open camera. Check permissions.')
+      }
+    }
+
+    // Small delay so the placeholder element exists and the modal transition
+    // has settled before the camera initialises.
+    timer = setTimeout(start, 150)
+
+    return () => {
+      cancelled = true
+      if (timer) clearTimeout(timer)
+      if (scanner) scanner.stop().catch(() => {})
+    }
+  }, [cameraOpen])
 
   // Warn before leaving if cart has items
   useEffect(() => {
@@ -365,22 +434,60 @@ export default function POS() {
         </div>
       )}
 
+      {/* Scanning indicator – shows while the keyboard wedge is buffering */}
+      {scannerActive && (
+        <div className="fixed bottom-5 right-5 z-40 flex items-center gap-2 bg-zinc-900/90 text-white text-sm font-medium px-4 py-2.5 rounded-full shadow-xl animate-pulse">
+          <svg className="h-4 w-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6M7 4H5a2 2 0 00-2 2v2m0 8v2a2 2 0 002 2h2m8-16h2a2 2 0 012 2v2m0 8v2a2 2 0 01-2 2h-2" />
+          </svg>
+          Scanning…
+        </div>
+      )}
+
+      {/* Mobile camera scanner modal */}
+      {cameraOpen && (
+        <div className="fixed inset-0 z-50 bg-zinc-900/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl p-5 w-full max-w-md">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-zinc-800">Scan Barcode</h3>
+              <button onClick={() => setCameraOpen(false)} className="text-zinc-400 hover:text-zinc-600 text-xl leading-none">✕</button>
+            </div>
+            <div id={cameraRegionId} className="w-full aspect-square bg-zinc-900 rounded-xl overflow-hidden" />
+            <p className="text-xs text-zinc-500 mt-3 text-center">
+              Point the camera at a product barcode or QR code.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Bento grid: main product area + sticky checkout sidebar */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Products area – takes 2 columns on large screens */}
         <div className="lg:col-span-2 space-y-4">
-          {/* Search bar */}
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="Search products by name or SKU..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 bg-white border border-zinc-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-zinc-800 placeholder-zinc-400"
-            />
-            <svg className="absolute left-3 top-3.5 h-5 w-5 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
+          {/* Search bar + camera scan */}
+          <div className="flex gap-3">
+            <div className="relative flex-1">
+              <input
+                type="text"
+                placeholder="Search products by name or SKU..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-3 bg-white border border-zinc-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-zinc-800 placeholder-zinc-400"
+              />
+              <svg className="absolute left-3 top-3.5 h-5 w-5 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
+            <button
+              onClick={() => setCameraOpen(true)}
+              className="inline-flex items-center gap-2 bg-zinc-800 hover:bg-zinc-900 text-white font-medium px-4 py-3 rounded-xl transition-colors shadow-sm"
+            >
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              Scan Barcode
+            </button>
           </div>
 
           {/* Product grid */}
@@ -423,7 +530,14 @@ export default function POS() {
         {/* Checkout sidebar – glassmorphism */}
         <div className="lg:col-span-1">
           <div className="sticky top-6 bg-white/80 backdrop-blur-sm border border-zinc-200 rounded-2xl shadow-xl p-5 space-y-4">
-            <h2 className="text-xl font-bold text-zinc-800">Checkout</h2>
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-bold text-zinc-800">Checkout</h2>
+              <span className={`inline-flex items-center justify-center min-w-[1.75rem] h-7 px-2 rounded-full text-xs font-bold ${
+                cart.length > 0 ? 'bg-emerald-600 text-white' : 'bg-zinc-200 text-zinc-500'
+              }`}>
+                {cart.length}
+              </span>
+            </div>
 
             {/* Cart items */}
             <div className="max-h-64 overflow-y-auto space-y-3">
@@ -466,7 +580,13 @@ export default function POS() {
                 </div>
               ))}
               {cart.length === 0 && (
-                <p className="text-zinc-400 text-sm text-center py-4">No items yet.</p>
+                <div className="flex flex-col items-center justify-center py-8 text-zinc-400">
+                  <svg className="h-10 w-10 mb-2 text-zinc-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                  </svg>
+                  <p className="text-sm">Your cart is empty</p>
+                  <p className="text-xs text-zinc-400 mt-1">Scan a barcode or tap a product to add items.</p>
+                </div>
               )}
             </div>
 

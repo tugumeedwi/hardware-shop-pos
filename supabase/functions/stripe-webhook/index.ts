@@ -43,11 +43,28 @@ async function findTenantByCustomer(supabase, stripeCustomerId) {
   return data?.id ?? null
 }
 
+/**
+ * Map a Stripe price id to our internal plan id via the plans table.
+ * Signup-tenant stores 'starter'/'pro' as tenants.plan_id, so persisting the
+ * raw Stripe price id here made the Pricing badge ("Current plan") never
+ * match. Falls back to the price id when the price is unknown.
+ */
+async function planIdFromPriceId(supabase, priceId) {
+  if (!priceId) return null
+  const { data } = await supabase
+    .from('plans')
+    .select('id')
+    .eq('stripe_price_id', priceId)
+    .maybeSingle()
+  return data?.id ?? priceId
+}
+
 async function upsertSubscription(supabase, tenantId, subscription) {
   if (!tenantId) return
 
   const status = mapStatus(subscription.status)
-  const planId = subscription.items?.data?.[0]?.price?.id ?? null
+  const priceId = subscription.items?.data?.[0]?.price?.id ?? null
+  const planId = await planIdFromPriceId(supabase, priceId)
   const currentPeriodEnd = subscription.current_period_end
     ? new Date(subscription.current_period_end * 1000).toISOString()
     : null

@@ -1,5 +1,6 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { getMemberContext, isOwner } from '../_shared/auth.ts'
+import { safeEndpoint } from '../_shared/ssrf.ts'
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -40,7 +41,11 @@ Deno.serve(async (req) => {
 
   if (!tenant) return json({ success: false, error: 'Tenant not found' }, 404)
 
-  const endpoint = tenant.tax_config?.endpoint_url || DEFAULT_ENDPOINT
+  // Validate the tenant-controlled endpoint (SSRF guard) before probing.
+  const { url: endpoint, error: endpointError } = safeEndpoint(tenant, DEFAULT_ENDPOINT)
+  if (endpointError) {
+    return json({ success: false, reachable: false, error: endpointError }, 200)
+  }
 
   // Send an empty ping; a reachable provider returns something other than a
   // network failure even if the server rejects the payload shape.

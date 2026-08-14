@@ -1,4 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
+import { safeEndpoint } from '../_shared/ssrf.ts'
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -130,10 +131,12 @@ async function sendSingleInvoice(taxInvoice) {
     .single()
 
   if (!sale) {
-    const retry_count = taxInvoice.retry_count + 1
+    // A missing linked sale is permanent (the sale was deleted or never
+    // synced) – retrying forever only spams the queue. Mark failed and stop.
+    const retry_count = (taxInvoice.retry_count ?? 0) + 1
     await supabase
       .from('tax_invoices')
-      .update({ status: 'failed', retry_count, next_retry_at: nextRetryAt(retry_count), last_retry_at: new Date().toISOString(), response_body: { error: 'Linked sale not found' } })
+      .update({ status: 'failed', retry_count, next_retry_at: null, last_retry_at: new Date().toISOString(), response_body: { error: 'Linked sale not found' } })
       .eq('id', taxInvoiceId)
     return
   }
@@ -145,10 +148,17 @@ async function sendSingleInvoice(taxInvoice) {
 
   const { jsonPayload, xmlPayload } = buildInvoiceRequest({ taxInvoice, sale, saleItems, customer, tenant })
 
-  const endpoint = tenant.tax_config?.endpoint_url || DEFAULT_ENDPOINT
+  // Validate the tenant-controlled endpoint (SSRF guard) before the retry.
+  const { url: endpoint, error: endpointError } = safeEndpoint(tenant, DEFAULT_ENDPOINT)
   const headers = { 'Content-Type': 'application/json' }
   const authToken = tenant.tax_config?.auth_token
   if (authToken) headers.Authorization = `Bearer ${authToken}`
+
+  if (endpointError) {
+    // Skip this invoice this run; it will be re-picked up on the next cycle.
+    console.warn(`[ura-invoice-cron] Skipping ${taxInvoice.invoice_number}: ${endpointError}`)
+    return
+  }
 
   try {
     const res = await fetch(endpoint, {

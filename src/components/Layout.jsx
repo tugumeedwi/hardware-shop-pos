@@ -2,12 +2,15 @@ import { useAuth } from '../context/AuthContext'
 import { supabase } from '../api/supabaseClient'
 import { useNavigate, Link } from 'react-router-dom'
 import { useSyncStatus } from '../hooks/useSyncStatus'
+import { useSessionTimeout } from '../hooks/useSessionTimeout'
+import { processSyncQueue } from '../utils/syncManager'
 import { Toaster } from 'react-hot-toast'
 
 export default function Layout({ children }) {
   const { profile, session, tenant } = useAuth()
   const navigate = useNavigate()
   const { pendingCount } = useSyncStatus()
+  const { showWarning, resetTimer } = useSessionTimeout()
 
   const BAD_SUBSCRIPTION_STATUSES = ['inactive', 'past_due', 'unpaid', 'cancelled', 'expired']
   const HARD_BLOCKED_STATUSES = ['past_due', 'unpaid', 'cancelled', 'expired']
@@ -15,11 +18,12 @@ export default function Layout({ children }) {
   const subscriptionBlocked = tenant && HARD_BLOCKED_STATUSES.includes(tenant.subscription_status)
 
   const handleLogout = async () => {
+    // Best-effort flush of pending offline sales before the session dies;
+    // the offline DB itself is preserved (it belongs to the shop).
+    if (navigator.onLine) {
+      try { await processSyncQueue() } catch { /* ignore */ }
+    }
     await supabase.auth.signOut()
-    // Clear local cached data
-    localStorage.clear()
-    const db = (await import('../db/localDatabase')).default
-    await db.delete()
     navigate('/login')
   }
 
@@ -79,6 +83,29 @@ export default function Layout({ children }) {
           </div>
         </div>
       )}
+      {/* Session timeout warning */}
+      {showWarning && (
+        <div className="fixed inset-0 z-50 bg-zinc-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white border border-zinc-200 rounded-2xl shadow-2xl p-8 w-full max-w-sm text-center space-y-4">
+            <div className="mx-auto h-12 w-12 rounded-full bg-amber-100 flex items-center justify-center">
+              <svg className="h-6 w-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <h2 className="text-xl font-bold text-zinc-800">Are you still there?</h2>
+            <p className="text-sm text-zinc-500 leading-relaxed">
+              You will be logged out soon due to inactivity.
+            </p>
+            <button
+              onClick={resetTimer}
+              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 rounded-xl transition-colors shadow-sm"
+            >
+              I&apos;m still here
+            </button>
+          </div>
+        </div>
+      )}
+
       <nav className="bg-white shadow p-3 flex justify-between items-center">
         <div className="flex gap-4">
           <Link to="/pos" className="font-bold text-blue-600">POS</Link>

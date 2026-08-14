@@ -87,6 +87,9 @@ export default function Pricing() {
   const isActive = current?.subscription_status === 'active'
   const currentPlanId = current?.plan_id
 
+  const isCurrentPlan = (plan) =>
+    isActive && (currentPlanId === plan.id || currentPlanId === plan.priceId)
+
   return (
     <div className="min-h-screen bg-zinc-50 p-4 font-sans">
       <div className="max-w-5xl mx-auto pt-8">
@@ -133,7 +136,7 @@ export default function Pricing() {
                 ))}
               </ul>
               <div className="mt-6">
-                {isActive && currentPlanId === plan.priceId ? (
+                {isCurrentPlan(plan) ? (
                   <div className="text-center text-sm font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-xl py-3">
                     Current plan
                   </div>

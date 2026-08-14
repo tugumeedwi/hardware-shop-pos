@@ -1,6 +1,7 @@
 // @deno-types="https://deno.land/x/supabase@2.x/mod.ts"
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { getMemberContext, isOwner } from '../_shared/auth.ts'
+import { safeEndpoint } from '../_shared/ssrf.ts'
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -227,7 +228,14 @@ Deno.serve(async (req) => {
     tenant: taxInvoice.tenant
   })
 
-  const endpoint = taxInvoice.tenant?.tax_config?.endpoint_url || DEFAULT_ENDPOINT
+  // The endpoint is tenant-controlled; validate it to prevent SSRF before any
+  // outbound request. Failing to validate is a hard error (never falls back to
+  // the default silently, which would send an invoice to the wrong host).
+  const { url: endpoint, error: endpointError } = safeEndpoint(taxInvoice.tenant, DEFAULT_ENDPOINT)
+  if (endpointError) {
+    await markFailed(supabase, tenantId, taxInvoiceId, { error: endpointError })
+    return json({ success: false, error: endpointError }, 422)
+  }
   const headers = { 'Content-Type': 'application/json' }
   const authToken = taxInvoice.tenant?.tax_config?.auth_token
   if (authToken) headers.Authorization = `Bearer ${authToken}`

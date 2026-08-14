@@ -131,10 +131,10 @@ export default function Customers() {
                 <tr key={c.id} className="hover:bg-zinc-50 transition-colors">
                   <td className="px-4 py-3 font-medium text-zinc-800">{c.name}</td>
                   <td className="px-4 py-3 text-zinc-600">{formatPhone(c.phone) || '-'}</td>
-                  <td className="px-4 py-3 text-right text-zinc-600">{c.credit_limit.toFixed(2)}</td>
-                  <td className={`px-4 py-3 text-right font-medium ${c.current_credit_balance > c.credit_limit ? 'text-red-600' : 'text-zinc-800'}`}>
-                    {c.current_credit_balance.toFixed(2)}
-                    {c.current_credit_balance > c.credit_limit && (
+                  <td className="px-4 py-3 text-right text-zinc-600">{(c.credit_limit || 0).toFixed(2)}</td>
+                  <td className={`px-4 py-3 text-right font-medium ${(c.current_credit_balance || 0) > (c.credit_limit || 0) ? 'text-red-600' : 'text-zinc-800'}`}>
+                    {(c.current_credit_balance || 0).toFixed(2)}
+                    {(c.current_credit_balance || 0) > (c.credit_limit || 0) && (
                       <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-700">OVER LIMIT</span>
                     )}
                   </td>

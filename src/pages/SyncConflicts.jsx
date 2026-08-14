@@ -5,6 +5,12 @@ import toast from 'react-hot-toast'
 export default function SyncConflicts() {
   const [conflicts, setConflicts] = useState([])
   const [loading, setLoading] = useState(true)
+  const [resolving, setResolving] = useState(null)
+
+  // Only these tables may be written back from a kept-local conflict.
+  // table_name originates in the DB (written by server RPCs), so treat it as
+  // untrusted input and never let it drive a supabase.from() call unchecked.
+  const RESOLVABLE_TABLES = new Set(['products', 'customers', 'sales', 'sale_items', 'expenses'])
 
   const fetchConflicts = async () => {
     const { data } = await supabase.from('sync_conflict_log').select('*').order('created_at', { ascending: false })
@@ -20,15 +26,31 @@ export default function SyncConflicts() {
 
     if (keepLocal && conflict.local_data) {
       const { table_name, record_id } = conflict
+      if (!RESOLVABLE_TABLES.has(table_name)) {
+        toast.error(`Table "${table_name}" is not resolvable from the client`)
+        return
+      }
       const local = conflict.local_data
-      const { id: _, ...payload } = local
-      await supabase.from(table_name).update(payload).eq('id', record_id)
+      const payload = { ...local }
+      delete payload.id
+      const { error } = await supabase.from(table_name).update(payload).eq('id', record_id)
+      if (error) {
+        console.error('Resolve local error:', error)
+        return toast.error('Failed to apply local version')
+      }
     }
 
-    await supabase.from('sync_conflict_log').update({
+    setResolving(id)
+    const { error } = await supabase.from('sync_conflict_log').update({
       resolved_by: (await supabase.auth.getUser()).data.user.id,
       resolution: keepLocal ? 'local' : 'server'
     }).eq('id', id)
+    setResolving(null)
+
+    if (error) {
+      console.error('Resolve conflict error:', error)
+      return toast.error('Failed to record resolution')
+    }
 
     toast.success(`Conflict resolved – kept ${keepLocal ? 'local' : 'server'} version`)
     fetchConflicts()
@@ -50,12 +72,12 @@ export default function SyncConflicts() {
                 <p className="text-sm text-zinc-500">{new Date(conflict.created_at).toLocaleString()}</p>
               </div>
               <div className="flex gap-2">
-                <button onClick={() => resolveConflict(conflict.id, true)}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors">
-                  Keep Local
+                <button onClick={() => resolveConflict(conflict.id, true)} disabled={resolving === conflict.id}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors disabled:opacity-60">
+                  {resolving === conflict.id ? 'Resolving…' : 'Keep Local'}
                 </button>
-                <button onClick={() => resolveConflict(conflict.id, false)}
-                  className="bg-zinc-200 hover:bg-zinc-300 text-zinc-700 px-4 py-2 rounded-xl text-sm font-medium transition-colors">
+                <button onClick={() => resolveConflict(conflict.id, false)} disabled={resolving === conflict.id}
+                  className="bg-zinc-200 hover:bg-zinc-300 text-zinc-700 px-4 py-2 rounded-xl text-sm font-medium transition-colors disabled:opacity-60">
                   Keep Server
                 </button>
               </div>

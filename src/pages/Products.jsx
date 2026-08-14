@@ -33,6 +33,15 @@ const baseForm = (isHardware) => ({
 
 const inputClass = 'border border-zinc-300 rounded-xl px-4 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400'
 
+const Field = ({ label, required, children }) => (
+  <label className="block">
+    <span className="block text-sm font-medium text-zinc-600 mb-1">
+      {label} {required && <span className="text-red-500">*</span>}
+    </span>
+    {children}
+  </label>
+)
+
 export default function Products() {
   const { tenant } = useAuth()
   const businessType = tenant?.business_type || 'hardware'
@@ -252,35 +261,45 @@ export default function Products() {
       <form onSubmit={handleSave} className="bg-white border border-zinc-200 rounded-2xl shadow-sm p-6 mb-8 max-w-3xl">
         <h2 className="text-lg font-semibold text-zinc-800 mb-4">{editing ? 'Edit Product' : 'Add New Product'}</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <input type="text" placeholder="Product Name *" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputClass} required />
-          <input type="text" placeholder="Category" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className={inputClass} />
-          <input type="text" placeholder={isPhone ? 'SKU (optional)' : 'SKU / Barcode'} value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} className={inputClass} />
+          <Field label="Product Name" required>
+            <input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputClass + ' w-full'} required />
+          </Field>
+          <Field label="Category">
+            <input type="text" placeholder="e.g. Cement, Sanitary, Accessories" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className={inputClass + ' w-full'} />
+          </Field>
+          <Field label={isPhone ? 'SKU (optional)' : 'SKU / Barcode'}>
+            <input type="text" placeholder={isPhone ? 'Internal code for this phone' : 'Scannable barcode / SKU'} value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} className={inputClass + ' w-full'} />
+          </Field>
           {isHardware ? (
-            <label className="flex items-center gap-2 text-zinc-700">
+            <label className="flex items-center gap-2 text-zinc-700 self-end pb-2.5">
               <input type="checkbox" checked={form.is_tile} onChange={(e) => setForm({ ...form, is_tile: e.target.checked })} className="rounded border-zinc-300 text-emerald-600 focus:ring-emerald-400" />
               Tile product?
             </label>
           ) : (
-            <div className="flex items-center text-sm text-zinc-500">
+            <div className="flex items-center text-sm text-zinc-500 self-end pb-2.5">
               {isPhone ? 'Phone product (sold by piece)' : 'General product (sold by piece)'}
             </div>
           )}
-          <input type="number" placeholder="Stock (pieces)" value={form.stock_quantity} onChange={(e) => setForm({ ...form, stock_quantity: Number(e.target.value) })} className={inputClass} required />
-          <input type="number" placeholder="Low stock threshold" value={form.low_stock_threshold} onChange={(e) => setForm({ ...form, low_stock_threshold: Number(e.target.value) })} className={inputClass} />
+          <Field label="Stock Quantity (pieces)" required>
+            <input type="number" min="0" value={form.stock_quantity} onChange={(e) => setForm({ ...form, stock_quantity: Number(e.target.value) })} className={inputClass + ' w-full'} required />
+          </Field>
+          <Field label="Low Stock Threshold">
+            <input type="number" min="0" value={form.low_stock_threshold} onChange={(e) => setForm({ ...form, low_stock_threshold: Number(e.target.value) })} className={inputClass + ' w-full'} />
+          </Field>
         </div>
 
         {/* Vertical-specific custom fields */}
         {isPhone && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
             {PHONE_ATTR_FIELDS.map(f => (
-              <input
-                key={f.key}
-                type="text"
-                placeholder={f.label}
-                value={form.attributes[f.key] || ''}
-                onChange={(e) => setForm({ ...form, attributes: { ...form.attributes, [f.key]: e.target.value } })}
-                className={inputClass}
-              />
+              <Field key={f.key} label={f.label}>
+                <input
+                  type="text"
+                  value={form.attributes[f.key] || ''}
+                  onChange={(e) => setForm({ ...form, attributes: { ...form.attributes, [f.key]: e.target.value } })}
+                  className={inputClass + ' w-full'}
+                />
+              </Field>
             ))}
           </div>
         )}
@@ -291,32 +310,36 @@ export default function Products() {
             <div className="space-y-2">
               {form.customAttributes.map((attr, index) => (
                 <div key={index} className="flex gap-2">
-                  <input
-                    type="text"
-                    placeholder="Attribute name (e.g. brand)"
-                    value={attr.key}
-                    onChange={(e) => {
-                      const next = [...form.customAttributes]
-                      next[index] = { ...next[index], key: e.target.value }
-                      setForm({ ...form, customAttributes: next })
-                    }}
-                    className={inputClass + ' flex-1'}
-                  />
-                  <input
-                    type="text"
-                    placeholder="Value"
-                    value={attr.value || ''}
-                    onChange={(e) => {
-                      const next = [...form.customAttributes]
-                      next[index] = { ...next[index], value: e.target.value }
-                      setForm({ ...form, customAttributes: next })
-                    }}
-                    className={inputClass + ' flex-1'}
-                  />
+                  <Field label={`Attribute ${index + 1} Name`}>
+                    <input
+                      type="text"
+                      placeholder="e.g. brand"
+                      value={attr.key}
+                      onChange={(e) => {
+                        const next = [...form.customAttributes]
+                        next[index] = { ...next[index], key: e.target.value }
+                        setForm({ ...form, customAttributes: next })
+                      }}
+                      className={inputClass + ' flex-1 w-full'}
+                    />
+                  </Field>
+                  <Field label={`Attribute ${index + 1} Value`}>
+                    <input
+                      type="text"
+                      placeholder="Value"
+                      value={attr.value || ''}
+                      onChange={(e) => {
+                        const next = [...form.customAttributes]
+                        next[index] = { ...next[index], value: e.target.value }
+                        setForm({ ...form, customAttributes: next })
+                      }}
+                      className={inputClass + ' flex-1 w-full'}
+                    />
+                  </Field>
                   <button
                     type="button"
                     onClick={() => setForm({ ...form, customAttributes: form.customAttributes.filter((_, i) => i !== index) })}
-                    className="px-3 text-red-400 hover:text-red-600 transition-colors"
+                    className="px-3 text-red-400 hover:text-red-600 transition-colors self-end pb-2.5"
                   >✕</button>
                 </div>
               ))}
@@ -341,23 +364,53 @@ export default function Products() {
               ))}
             </div>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
-              {form.active_methods.piece && <input type="number" step="0.01" placeholder="Price/piece" value={form.price_per_piece} onChange={(e) => setForm({ ...form, price_per_piece: e.target.value })} className={inputClass} />}
-              {form.active_methods.box && <input type="number" step="0.01" placeholder="Price/box" value={form.price_per_box} onChange={(e) => setForm({ ...form, price_per_box: e.target.value })} className={inputClass} />}
-              {form.active_methods.sqm && <input type="number" step="0.01" placeholder="Price/sqm" value={form.price_per_sqm} onChange={(e) => setForm({ ...form, price_per_sqm: e.target.value })} className={inputClass} />}
-              {form.active_methods.kg && <input type="number" step="0.01" placeholder="Price/kg" value={form.price_per_kg} onChange={(e) => setForm({ ...form, price_per_kg: e.target.value })} className={inputClass} />}
+              {form.active_methods.piece && (
+                <Field label="Price per Piece (UGX)">
+                  <input type="number" step="0.01" min="0" value={form.price_per_piece} onChange={(e) => setForm({ ...form, price_per_piece: e.target.value })} className={inputClass + ' w-full'} />
+                </Field>
+              )}
+              {form.active_methods.box && (
+                <Field label="Price per Box (UGX)">
+                  <input type="number" step="0.01" min="0" value={form.price_per_box} onChange={(e) => setForm({ ...form, price_per_box: e.target.value })} className={inputClass + ' w-full'} />
+                </Field>
+              )}
+              {form.active_methods.sqm && (
+                <Field label="Price per Sqm (UGX)">
+                  <input type="number" step="0.01" min="0" value={form.price_per_sqm} onChange={(e) => setForm({ ...form, price_per_sqm: e.target.value })} className={inputClass + ' w-full'} />
+                </Field>
+              )}
+              {form.active_methods.kg && (
+                <Field label="Price per Kg (UGX)">
+                  <input type="number" step="0.01" min="0" value={form.price_per_kg} onChange={(e) => setForm({ ...form, price_per_kg: e.target.value })} className={inputClass + ' w-full'} />
+                </Field>
+              )}
             </div>
 
             {(form.is_tile || form.active_methods.kg) && (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-                {form.is_tile && form.active_methods.box && <input type="number" step="any" placeholder="Pieces per box *" value={form.pieces_per_box} onChange={(e) => setForm({ ...form, pieces_per_box: e.target.value })} className={inputClass} />}
-                {form.is_tile && form.active_methods.sqm && <input type="number" step="any" placeholder="m² per piece *" value={form.m2_per_piece} onChange={(e) => setForm({ ...form, m2_per_piece: e.target.value })} className={inputClass} />}
-                {form.active_methods.kg && <input type="number" step="any" placeholder="Pieces per kg *" value={form.pieces_per_kg} onChange={(e) => setForm({ ...form, pieces_per_kg: e.target.value })} className={inputClass} />}
+                {form.is_tile && form.active_methods.box && (
+                  <Field label="Pieces per Box" required>
+                    <input type="number" step="any" min="0" value={form.pieces_per_box} onChange={(e) => setForm({ ...form, pieces_per_box: e.target.value })} className={inputClass + ' w-full'} />
+                  </Field>
+                )}
+                {form.is_tile && form.active_methods.sqm && (
+                  <Field label="m² per Piece" required>
+                    <input type="number" step="any" min="0" value={form.m2_per_piece} onChange={(e) => setForm({ ...form, m2_per_piece: e.target.value })} className={inputClass + ' w-full'} />
+                  </Field>
+                )}
+                {form.active_methods.kg && (
+                  <Field label="Pieces per Kg" required>
+                    <input type="number" step="any" min="0" value={form.pieces_per_kg} onChange={(e) => setForm({ ...form, pieces_per_kg: e.target.value })} className={inputClass + ' w-full'} />
+                  </Field>
+                )}
               </div>
             )}
           </>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-            <input type="number" step="0.01" placeholder="Price per piece *" value={form.price_per_piece} onChange={(e) => setForm({ ...form, price_per_piece: e.target.value })} className={inputClass} />
+            <Field label="Price per Piece (UGX)" required>
+              <input type="number" step="0.01" min="0" value={form.price_per_piece} onChange={(e) => setForm({ ...form, price_per_piece: e.target.value })} className={inputClass + ' w-full'} />
+            </Field>
             <div className="col-span-2 flex items-center text-sm text-zinc-500 mt-1">
               Sold by piece only – unit selection is hidden in the POS for this product type.
             </div>
