@@ -81,7 +81,8 @@ export function AuthProvider({ children }) {
   async function fetchMemberships(user) {
     const { data, error } = await supabase
       .from('tenant_memberships')
-      .select('tenant_id, role, tenants!inner(id, name, industry, business_rules, business_type, subscription_status, tax_enabled)')
+      .select('tenant_id, role, tenants!inner(id, name, industry, business_rules, business_type, subscription_status, subscription_end_date, tax_enabled)')
+      .eq('user_id', user?.id)
 
     if (error) {
       console.warn('Failed to load tenant memberships:', error.message)
@@ -136,6 +137,7 @@ export function AuthProvider({ children }) {
         business_rules: membership.tenants?.business_rules || {},
         business_type: membership.tenants?.business_type || 'hardware',
         subscription_status: membership.tenants?.subscription_status || null,
+        subscription_end_date: membership.tenants?.subscription_end_date || null,
         tax_enabled: membership.tenants?.tax_enabled || false
       })
       setNeedsTenantSelection(false)

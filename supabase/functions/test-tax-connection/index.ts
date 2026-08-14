@@ -1,4 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
+import { getMemberContext, isOwner } from '../_shared/auth.ts'
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -22,21 +23,22 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   if (req.method !== 'POST') return json({ success: false, error: 'Method not allowed' }, 405)
 
-  let body
-  try { body = await req.json() } catch { return json({ success: false, error: 'Invalid JSON body' }, 400) }
-
-  const tenantId = body?.tenant_id
-  if (!tenantId) return json({ success: false, error: 'tenant_id is required' }, 400)
-
+  // E-invoicing configuration is provider/owner-sensitive: derive the tenant
+  // from the verified session (never from the body) and require the owner role.
   const supabase = createClient(supabaseUrl, supabaseServiceKey)
+  const context = await getMemberContext(req, supabase)
+  if (context.error || !isOwner(context) || !context.tenantId) {
+    return json({ success: false, error: 'Owner permissions required' }, 403)
+  }
+  const tenantId = context.tenantId
 
-  const { data: tenant, error } = await supabase
+  const { data: tenant } = await supabase
     .from('tenants')
-    .select('id, name, tax_enabled, tax_tin, tax_device_serial, tax_provider, tax_config')
+    .select('id, tax_config')
     .eq('id', tenantId)
     .single()
 
-  if (error || !tenant) return json({ success: false, error: error?.message || 'Tenant not found' }, 404)
+  if (!tenant) return json({ success: false, error: 'Tenant not found' }, 404)
 
   const endpoint = tenant.tax_config?.endpoint_url || DEFAULT_ENDPOINT
 
@@ -59,16 +61,14 @@ Deno.serve(async (req) => {
     return json({
       success: true,
       reachable: true,
-      status_code: res.status,
-      provider: endpoint
+      status_code: res.status
     })
   } catch (err) {
     const aborted = err?.name === 'AbortError'
     return json({
       success: false,
       reachable: false,
-      error: aborted ? 'Connection timed out' : err?.message ?? 'Connection failed',
-      provider: endpoint
+      error: aborted ? 'Connection timed out' : 'Connection failed'
     }, 200)
   }
 })

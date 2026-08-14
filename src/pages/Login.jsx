@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { supabase } from '../api/supabaseClient'
 import { useAuth } from '../context/AuthContext'
-import { Navigate } from 'react-router-dom'
+import { Navigate, Link } from 'react-router-dom'
 
 export default function Login() {
   const { session } = useAuth()
@@ -63,6 +63,10 @@ export default function Login() {
         >
           {loading ? 'Signing in...' : 'Sign In'}
         </button>
+        <p className="text-center text-sm text-zinc-500">
+          New here?{' '}
+          <Link to="/register" className="text-emerald-600 hover:underline font-medium">Create a shop</Link>
+        </p>
       </form>
     </div>
   )

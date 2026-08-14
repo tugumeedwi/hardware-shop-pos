@@ -1,5 +1,6 @@
 // @deno-types="https://deno.land/x/supabase@2.x/mod.ts"
 import { createClient } from 'npm:@supabase/supabase-js@2'
+import { getMemberContext, isOwner } from '../_shared/auth.ts'
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -117,7 +118,7 @@ function buildInvoiceRequest({ taxInvoice, sale, saleItems, customer, tenant }) 
   return { jsonPayload, xmlPayload, tax: { taxable, taxRate, taxAmount, total } }
 }
 
-async function markSuccess(supabase, taxInvoiceId, fiscalId, responseBody) {
+async function markSuccess(supabase, tenantId, taxInvoiceId, fiscalId, responseBody) {
   const { error } = await supabase
     .from('tax_invoices')
     .update({
@@ -127,14 +128,16 @@ async function markSuccess(supabase, taxInvoiceId, fiscalId, responseBody) {
       last_retry_at: new Date().toISOString()
     })
     .eq('id', taxInvoiceId)
+    .eq('tenant_id', tenantId)
   if (error) throw error
 }
 
-async function markFailed(supabase, taxInvoiceId, responseBody) {
+async function markFailed(supabase, tenantId, taxInvoiceId, responseBody) {
   const { data: current } = await supabase
     .from('tax_invoices')
     .select('retry_count')
     .eq('id', taxInvoiceId)
+    .eq('tenant_id', tenantId)
     .single()
 
   const { error } = await supabase
@@ -146,6 +149,7 @@ async function markFailed(supabase, taxInvoiceId, responseBody) {
       last_retry_at: new Date().toISOString()
     })
     .eq('id', taxInvoiceId)
+    .eq('tenant_id', tenantId)
   if (error) throw error
 }
 
@@ -163,6 +167,15 @@ Deno.serve(async (req) => {
   if (!taxInvoiceId) return json({ success: false, error: 'tax_invoice_id is required' }, 400)
 
   const supabase = createClient(supabaseUrl, supabaseServiceKey)
+
+  // The caller must be an owner and the invoice MUST belong to the caller's
+  // tenant. Filtering the lookup by tenant_id makes cross-tenant access a
+  // guaranteed miss (IDOR is closed) before any provider request is made.
+  const context = await getMemberContext(req, supabase)
+  if (context.error || !isOwner(context) || !context.tenantId) {
+    return json({ success: false, error: 'Owner permissions required' }, 403)
+  }
+  const tenantId = context.tenantId
 
   const { data: taxInvoice, error: findError } = await supabase
     .from('tax_invoices')
@@ -188,15 +201,16 @@ Deno.serve(async (req) => {
       tenant:tenant_id(id, name, tax_tin, tax_device_serial, tax_config, tax_provider)
     `)
     .eq('id', taxInvoiceId)
+    .eq('tenant_id', tenantId)
     .single()
 
   if (findError || !taxInvoice) {
-    return json({ success: false, error: findError?.message || 'tax_invoice not found' }, 404)
+    return json({ success: false, error: 'tax_invoice not found' }, 404)
   }
 
   const sale = taxInvoice.sale
   if (!sale) {
-    await markFailed(supabase, taxInvoiceId, { error: 'Linked sale not found' })
+    await markFailed(supabase, tenantId, taxInvoiceId, { error: 'Linked sale not found' })
     return json({ success: false, error: 'Linked sale not found' }, 422)
   }
 
@@ -234,7 +248,7 @@ Deno.serve(async (req) => {
     }
 
     if (!res.ok) {
-      throw new Error(`Provider responded with ${res.status}: ${raw}`)
+      throw new Error(`Provider responded with ${res.status}`)
     }
 
     const fiscalId =
@@ -248,11 +262,11 @@ Deno.serve(async (req) => {
       throw new Error('Provider response did not include a fiscal id')
     }
 
-    await markSuccess(supabase, taxInvoiceId, fiscalId, responseBody)
+    await markSuccess(supabase, tenantId, taxInvoiceId, fiscalId, responseBody)
     return json({ success: true, tax_invoice_id: taxInvoiceId, fiscal_id: fiscalId }, 200)
   } catch (err) {
     console.error('[send-tax-invoice] Delivery failed:', err.message)
-    await markFailed(supabase, taxInvoiceId, { error: err.message, xml_payload: xmlPayload })
-    return json({ success: false, tax_invoice_id: taxInvoiceId, error: err.message }, 502)
+    await markFailed(supabase, tenantId, taxInvoiceId, { error: 'delivery failed', xml_payload: xmlPayload })
+    return json({ success: false, tax_invoice_id: taxInvoiceId, error: 'Delivery failed' }, 502)
   }
 })

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
-import toast from 'react-hot-toast'
-import { useAuth } from '../context/AuthContext'
 import { supabase } from '../api/supabaseClient'
+import { useAuth } from '../context/AuthContext'
+import toast from 'react-hot-toast'
 
 export default function TaxSettings() {
   const { tenant } = useAuth()
@@ -14,6 +14,30 @@ export default function TaxSettings() {
   const [taxProvider, setTaxProvider] = useState('ura_fdn')
   const [endpointUrl, setEndpointUrl] = useState('https://ura.example.com/api/invoice')
   const [authToken, setAuthToken] = useState('')
+
+  const [certFile, setCertFile] = useState(null)
+  const [certPassword, setCertPassword] = useState('')
+  const [uploading, setUploading] = useState(false)
+  const [pendingCount, setPendingCount] = useState(0)
+
+  const loadTaxSettings = (data) => {
+    setTaxEnabled(!!data.tax_enabled)
+    setTaxTin(data.tax_tin || '')
+    setTaxDeviceSerial(data.tax_device_serial || '')
+    setTaxProvider(data.tax_provider || 'ura_fdn')
+    setEndpointUrl(data.tax_config?.endpoint_url || 'https://ura.example.com/api/invoice')
+    setAuthToken(data.tax_config?.auth_token || '')
+  }
+
+  const fetchPendingCount = async () => {
+    if (!tenant?.id) return
+    const { count } = await supabase
+      .from('tax_invoices')
+      .select('*', { count: 'exact', head: true })
+      .eq('tenant_id', tenant.id)
+      .in('status', ['pending', 'failed'])
+    setPendingCount(count || 0)
+  }
 
   useEffect(() => {
     if (tenant?.id) {
@@ -28,16 +52,10 @@ export default function TaxSettings() {
             console.warn('Failed to load tax settings:', error.message)
             return
           }
-          if (data) {
-            setTaxEnabled(!!data.tax_enabled)
-            setTaxTin(data.tax_tin || '')
-            setTaxDeviceSerial(data.tax_device_serial || '')
-            setTaxProvider(data.tax_provider || 'ura_fdn')
-            setEndpointUrl(data.tax_config?.endpoint_url || 'https://ura.example.com/api/invoice')
-            setAuthToken(data.tax_config?.auth_token || '')
-          }
+          if (data) loadTaxSettings(data)
         })
         .finally(() => setLoadingTax(false))
+      fetchPendingCount()
     }
   }, [tenant?.id])
 
@@ -74,9 +92,7 @@ export default function TaxSettings() {
     if (!tenant?.id) return toast.error('No active tenant')
     setTestingTax(true)
     try {
-      const { data, error } = await supabase.functions.invoke('test-tax-connection', {
-        body: { tenant_id: tenant.id }
-      })
+      const { data, error } = await supabase.functions.invoke('test-tax-connection', {})
       if (error) throw error
 
       if (data?.reachable) {
@@ -92,11 +108,43 @@ export default function TaxSettings() {
     }
   }
 
+  const handleUploadCert = async (e) => {
+    e.preventDefault()
+    if (!certFile || !certPassword) return toast.error('Select certificate and enter password')
+    if (!tenant?.id) return toast.error('No active tenant')
+    setUploading(true)
+
+    const reader = new FileReader()
+    reader.onload = async () => {
+      try {
+        const certBase64 = reader.result.split(',')[1]
+        const { data, error } = await supabase.functions.invoke('upload-ura-cert', {
+          body: { certBase64, certPassword }
+        })
+        if (error) throw error
+        if (!data?.success) throw new Error(data?.error || 'Upload failed')
+        toast.success('Certificate uploaded successfully')
+        setCertFile(null)
+        setCertPassword('')
+      } catch (err) {
+        console.error('Certificate upload error:', err)
+        toast.error(`Certificate upload failed: ${err.message}`)
+      } finally {
+        setUploading(false)
+      }
+    }
+    reader.onerror = () => {
+      setUploading(false)
+      toast.error('Failed to read certificate file')
+    }
+    reader.readAsDataURL(certFile)
+  }
+
   const inputClass = 'w-full border border-zinc-300 rounded-xl px-4 py-3 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400 text-zinc-800'
 
   return (
     <div className="min-h-screen bg-zinc-50 p-4 font-sans flex items-start justify-center pt-12">
-      <div className="w-full max-w-2xl">
+      <div className="w-full max-w-2xl space-y-6">
         <div className="bg-white border border-zinc-200 rounded-2xl shadow-sm p-6">
           <div className="flex items-center justify-between mb-2">
             <h1 className="text-2xl font-bold text-zinc-800">E‑invoicing</h1>
@@ -191,6 +239,47 @@ export default function TaxSettings() {
               </button>
             </div>
           </div>
+        </div>
+
+        <div className="bg-white border border-zinc-200 rounded-2xl shadow-sm p-6">
+          <h2 className="text-lg font-semibold text-zinc-800 mb-4">Upload PKI Certificate (.pfx / .p12)</h2>
+          <form onSubmit={handleUploadCert} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-zinc-700 mb-1">Certificate File</label>
+              <input
+                type="file"
+                accept=".pfx,.p12"
+                onChange={(e) => setCertFile(e.target.files?.[0] || null)}
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-zinc-700 mb-1">Certificate Password</label>
+              <input
+                type="password"
+                value={certPassword}
+                onChange={(e) => setCertPassword(e.target.value)}
+                className={inputClass}
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={uploading}
+              className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold px-5 py-2.5 rounded-xl transition-colors"
+            >
+              {uploading ? 'Uploading…' : 'Upload Certificate'}
+            </button>
+          </form>
+        </div>
+
+        <div className="bg-white border border-zinc-200 rounded-2xl shadow-sm p-6">
+          <div className="flex items-center justify-between mb-1">
+            <h2 className="text-lg font-semibold text-zinc-800">Sync Health</h2>
+            <button onClick={fetchPendingCount} className="text-sm text-emerald-600 hover:underline">
+              Refresh
+            </button>
+          </div>
+          <p className="text-zinc-600">Pending invoices (awaiting URA): {pendingCount}</p>
         </div>
       </div>
     </div>

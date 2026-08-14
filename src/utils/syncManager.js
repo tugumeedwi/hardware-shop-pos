@@ -2,11 +2,13 @@ import { supabase } from '../api/supabaseClient'
 import db from '../db/localDatabase'
 
 let syncInProgress = false
+const MAX_SYNC_ATTEMPTS = 10
 
 /**
  * After a sale is confirmed on the server, queue a URA/FDN tax invoice when
- * the active tenant has e-invoicing enabled. Uses the caller's JWT so RLS
- * scopes the tenants lookup and the tax_invoices insert to the right tenant.
+ * the active tenant has e-invoicing enabled. The tax_invoices insert is a
+ * plain client insert, so RLS + the set_tenant_id() trigger stamp it to the
+ * actual active tenant.
  */
 export async function queueTaxInvoiceAfterSale(saleId) {
   try {
@@ -58,22 +60,35 @@ export async function processSyncQueue() {
       return
     }
 
-    console.log(`Processing ${queue.length} sync items...`)
+    const now = Date.now()
+    let attempted = 0
 
     for (const item of queue) {
+      // Skip items still in exponential backoff
+      if (item.nextRetryAt && new Date(item.nextRetryAt).getTime() > now) continue
+      attempted++
+
       try {
         await processSyncItem(item)
         await db.syncQueue.delete(item.id)
       } catch (error) {
-        console.error('Sync item failed:', item, error)
+        const attempts = (item.attempts || 0) + 1
+        console.error(`Sync item failed (attempt ${attempts}):`, item, error)
 
-        // If it's a pending sale with stock error, ensure conflict is logged
-        if (item.operation === 'INSERT_PENDING_SALE' && error.message.includes('Insufficient stock')) {
-          // Conflict already logged in syncPendingSale; leave item in queue for manual review.
+        // Log once per item on the first failure so the conflict stays visible
+        // in the SyncConflicts page without being re-inserted every pass.
+        if (attempts === 1) await logSyncConflict(item, error)
+
+        if (attempts >= MAX_SYNC_ATTEMPTS) {
+          await db.syncQueue.delete(item.id)
+        } else {
+          const nextRetryAt = new Date(now + Math.min(60_000, 2 ** attempts * 1_000)).toISOString()
+          await db.syncQueue.update(item.id, { attempts, nextRetryAt })
         }
-        // For other errors, just continue to next item
       }
     }
+
+    if (attempted === 0) return // nothing was ready; keep the current mirrors
 
     // After processing all queue items, refresh local mirrors
     await refreshLocalCache()
@@ -109,172 +124,41 @@ async function processSyncItem(item) {
   }
 }
 
+async function logSyncConflict(item, error) {
+  const msg = error?.message || String(error)
+  const tableName =
+    /stock|product not found/i.test(msg) && item.operation === 'INSERT_PENDING_SALE'
+      ? 'products'
+      : item.tableName || 'sales'
+
+  const { error: logErr } = await supabase.from('sync_conflict_log').insert({
+    table_name: tableName,
+    record_id: item.recordId || item.payload?.offline_created_at || null,
+    local_data: { operation: item.operation, payload: item.payload },
+    server_data: { error: msg },
+    created_at: new Date().toISOString()
+  })
+  if (logErr) console.error('Failed to log sync conflict:', logErr.message)
+}
+
 async function syncPendingSale(saleData) {
-  // ----- Idempotency check: prevent duplicate sale -----
-  if (saleData.idempotency_key) {
-    const { data: existing } = await supabase
-      .from('sales')
-      .select('id')
-      .eq('idempotency_key', saleData.idempotency_key)
-      .maybeSingle()
+  // The server-side create_sale RPC recalculates prices and stock from the
+  // live catalog inside a single transaction, verifies the reported total
+  // (tamper check), enforces idempotency and credit limits, inserts sale +
+  // sale_items and deducts stock. This replaces the old multi-step client path
+  // (~2N+7 network calls, non-atomic stock deduction) with one call. Cross-
+  // tenant references inside saleData are impossible to abuse: the RPC resolves
+  // every product/customer against the caller's tenant via get_my_tenant().
+  const { data: saleId, error: rpcError } = await supabase.rpc('create_sale', {
+    sale_data: saleData
+  })
 
-    if (existing) {
-      // Sale already synced – remove from pending and skip
-      const pending = await db.pendingSales
-        .where('saleData.offline_created_at')
-        .equals(saleData.offline_created_at)
-        .first()
-      if (pending) await db.pendingSales.delete(pending.localId)
-      return
-    }
+  if (rpcError) {
+    throw rpcError
   }
 
-  // ----- 1. Recalculate items using current server prices & conversions -----
-  const recalculatedItems = []
-  let recalculatedTotal = 0
-
-  for (const item of saleData.items) {
-    // Fetch current product data
-    const { data: product, error: prodError } = await supabase
-      .from('products')
-      .select('price_per_piece, price_per_box, price_per_sqm, price_per_kg, pieces_per_box, m2_per_piece, pieces_per_kg, stock_quantity')
-      .eq('id', item.product_id)
-      .single()
-
-    if (prodError || !product) {
-      await supabase.from('sync_conflict_log').insert({
-        table_name: 'products',
-        record_id: item.product_id,
-        local_data: { sale_id: saleData.offline_created_at, product_id: item.product_id },
-        server_data: { error: 'Product not found' },
-        created_at: new Date().toISOString()
-      })
-      throw new Error('Product not found during sync')
-    }
-
-    // Determine correct unit price from server
-    let unitPrice = 0
-    if (item.selling_unit === 'piece') unitPrice = product.price_per_piece
-    else if (item.selling_unit === 'box') unitPrice = product.price_per_box
-    else if (item.selling_unit === 'sqm') unitPrice = product.price_per_sqm
-    else if (item.selling_unit === 'kg') unitPrice = product.price_per_kg
-
-    // Calculate stock deduction
-    let deductionPieces = 0
-    if (item.selling_unit === 'piece') deductionPieces = item.quantity_sold
-    else if (item.selling_unit === 'box') deductionPieces = item.quantity_sold * (product.pieces_per_box || 0)
-    else if (item.selling_unit === 'sqm') deductionPieces = product.m2_per_piece
-      ? Math.ceil(item.quantity_sold / product.m2_per_piece)
-      : 0
-    else if (item.selling_unit === 'kg') deductionPieces = product.pieces_per_kg
-      ? Math.ceil(item.quantity_sold * product.pieces_per_kg)
-      : 0
-
-    // Check stock availability
-    if (deductionPieces > product.stock_quantity) {
-      await supabase.from('sync_conflict_log').insert({
-        table_name: 'products',
-        record_id: item.product_id,
-        local_data: { product_id: item.product_id, deduction: deductionPieces, sale_id: saleData.offline_created_at },
-        server_data: { stock_quantity: product.stock_quantity },
-        created_at: new Date().toISOString()
-      })
-      throw new Error('Insufficient stock for ' + item.product_id)
-    }
-
-    const lineTotal = item.quantity_sold * unitPrice
-    recalculatedItems.push({
-      ...item,
-      unit_price: unitPrice,
-      stock_deduction_pieces: deductionPieces,
-      line_total: lineTotal
-    })
-    recalculatedTotal += lineTotal
-  }
-
-  // 2. Apply discount from saleData (allow max original discount)
-  const discount = parseFloat(saleData.discount_total) || 0
-  const finalTotal = recalculatedTotal - discount
-
-  // 3. Tamper check: if client total differs by more than 0.01, reject
-  const clientTotal = parseFloat(saleData.total_amount) || 0
-  if (Math.abs(finalTotal - clientTotal) > 0.01) {
-    await supabase.from('sync_conflict_log').insert({
-      table_name: 'sales',
-      record_id: saleData.offline_created_at,
-      local_data: { client_total: clientTotal, client_discount: discount, items: saleData.items },
-      server_data: { recalculated_total: finalTotal, recalculated_items: recalculatedItems },
-      created_at: new Date().toISOString()
-    })
-    throw new Error('Sale total mismatch – possible tampering')
-  }
-
-  // 4. Insert sale with recalculated values
-  const { data: sale, error: saleError } = await supabase.from('sales').insert({
-    cashier_id: saleData.cashier_id,
-    type: saleData.type,
-    status: saleData.status,
-    payment_method: saleData.payment_method,
-    discount_total: discount,
-    total_amount: finalTotal,
-    amount_paid: saleData.amount_paid,
-    customer_id: saleData.customer_id,
-    offline_created_at: saleData.offline_created_at,
-    sync_status: 'synced',
-    idempotency_key: saleData.idempotency_key
-  }).select('id').single()
-
-  if (saleError) throw saleError
-
-  // 5. Insert items and deduct stock atomically
-  const itemsToInsert = recalculatedItems.map(item => ({ ...item, sale_id: sale.id }))
-  const { error: itemsError } = await supabase.from('sale_items').insert(itemsToInsert)
-  if (itemsError) throw itemsError
-
-  for (const item of recalculatedItems) {
-    const { error: deductError } = await supabase.rpc('deduct_stock', {
-      product_id: item.product_id,
-      deduction: item.stock_deduction_pieces
-    })
-    if (deductError) {
-      await supabase.from('sync_conflict_log').insert({
-        table_name: 'products',
-        record_id: item.product_id,
-        local_data: { product_id: item.product_id, deduction: item.stock_deduction_pieces, sale_id: sale.id },
-        server_data: { error: deductError.message },
-        created_at: new Date().toISOString()
-      })
-      throw deductError
-    }
-  }
-
-  // 6. Credit handling – enforce limit server-side
-  if (saleData.payment_method === 'credit' && saleData.customer_id) {
-    const { data: customer } = await supabase
-      .from('customers')
-      .select('current_credit_balance, credit_limit')
-      .eq('id', saleData.customer_id)
-      .single()
-
-    if (customer) {
-      const newBalance = customer.current_credit_balance + finalTotal
-      if (newBalance > customer.credit_limit) {
-        throw new Error('Credit limit exceeded after recalculation')
-      }
-      await supabase.from('customers').update({ current_credit_balance: newBalance }).eq('id', saleData.customer_id)
-      await supabase.from('credit_transactions').insert({
-        customer_id: saleData.customer_id,
-        sale_id: sale.id,
-        amount: finalTotal,
-        balance_after: newBalance,
-        notes: 'POS credit sale (synced from offline)'
-      })
-    }
-  }
-
-  // 6b. Queue a tax invoice for this sale if e-invoicing is enabled
-  if (sale?.id) {
-    await queueTaxInvoiceAfterSale(sale.id)
+  if (saleId) {
+    await queueTaxInvoiceAfterSale(saleId)
   }
 
   // Remove from pendingSales
@@ -288,15 +172,21 @@ async function syncPendingSale(saleData) {
 async function refreshLocalCache() {
   try {
     const { data: products } = await supabase.from('products').select('*').eq('is_deleted', false)
-    if (products) {
-      await db.products.clear()
-      await db.products.bulkPut(products)
-    }
-
     const { data: customers } = await supabase.from('customers').select('*')
-    if (customers) {
-      await db.customers.clear()
-      await db.customers.bulkPut(customers)
+
+    if (products || customers) {
+      // Replace the mirrors atomically so a crash between clear()/bulkPut
+      // cannot leave an empty/partial offline catalog.
+      await db.transaction('rw', db.products, db.customers, async () => {
+        if (products) {
+          await db.products.clear()
+          await db.products.bulkPut(products)
+        }
+        if (customers) {
+          await db.customers.clear()
+          await db.customers.bulkPut(customers)
+        }
+      })
     }
 
     // Clean old sync queue items (older than 30 days)

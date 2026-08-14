@@ -1,0 +1,24 @@
+[functions]
+  [functions.send-tax-invoice]
+    verify_jwt = true
+  [functions.create-checkout-session]
+    verify_jwt = true
+  [functions.stripe-webhook]
+    verify_jwt = false        # Webhook comes from Stripe, not a user
+  [functions.get-subscription-status]
+    verify_jwt = true
+  [functions.track-usage]
+    verify_jwt = true
+  [functions.check-usage]
+    verify_jwt = true
+  [functions.signup-tenant]
+    verify_jwt = false        # Public signup endpoint
+  [functions.reset-password]
+    verify_jwt = true
+  [functions.test-tax-connection]
+    verify_jwt = true
+  [functions.upload-ura-cert]
+    verify_jwt = true
+  [functions.ura-invoice-cron]
+    verify_jwt = false              # Invoked by pg_cron scheduler, not a user
+    schedule = "*/1 * * * *"
