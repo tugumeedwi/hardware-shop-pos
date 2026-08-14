@@ -41,7 +41,7 @@ create policy tenants_update_owner on public.tenants
     id = public.get_my_tenant()
     and exists (
       select 1 from public.tenant_memberships tm
-      where tm.tenant_id = id
+      where tm.tenant_id = public.tenants.id
         and tm.user_id = public.auth_uid()
         and tm.role = 'owner'
     )
@@ -50,7 +50,7 @@ create policy tenants_update_owner on public.tenants
     id = public.get_my_tenant()
     and exists (
       select 1 from public.tenant_memberships tm
-      where tm.tenant_id = id
+      where tm.tenant_id = public.tenants.id
         and tm.user_id = public.auth_uid()
         and tm.role = 'owner'
     )
