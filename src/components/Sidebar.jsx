@@ -1,4 +1,5 @@
 import { NavLink, Link } from 'react-router-dom'
+import BrandMark from './BrandMark'
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -15,7 +16,6 @@ import {
   FileCheck,
   ShieldCheck,
   Plus,
-  Store,
   X,
 } from 'lucide-react'
 
@@ -96,11 +96,9 @@ export default function Sidebar({ open, onClose, isOwner, isPlatformAdmin }) {
       >
         <div className="flex items-center justify-between h-16 px-5 border-b border-sidebar-text/10 shrink-0">
           <div className="flex items-center gap-2.5">
-            <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center">
-              <Store className="h-5 w-5 text-white" />
-            </div>
+            <BrandMark className="h-9 w-9 shrink-0" />
             <span className="text-lg font-bold text-white">
-              POS<span className="text-primary-light">suite</span>
+              SalesHub <span className="text-primary-light">POS</span>
             </span>
           </div>
           <button
@@ -148,7 +146,7 @@ export default function Sidebar({ open, onClose, isOwner, isPlatformAdmin }) {
         </nav>
 
         <div className="px-4 py-4 border-t border-sidebar-text/10 shrink-0">
-          <p className="text-[11px] text-sidebar-text/60">POSsuite · v1.0</p>
+          <p className="text-[11px] text-sidebar-text/60">SalesHub POS · v1.0</p>
         </div>
       </aside>
     </>

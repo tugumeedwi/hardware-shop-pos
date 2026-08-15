@@ -7,6 +7,7 @@ import { useSessionTimeout } from '../hooks/useSessionTimeout'
 import { processSyncQueue } from '../utils/syncManager'
 import { Toaster } from 'react-hot-toast'
 import Sidebar from './Sidebar'
+import BrandMark from './BrandMark'
 import { Menu, RefreshCw, LogOut } from 'lucide-react'
 
 export default function Layout({ children }) {
@@ -145,7 +146,10 @@ export default function Layout({ children }) {
             >
               <Menu className="h-6 w-6" />
             </button>
-            <span className="hidden md:inline font-bold text-heading">POSsuite</span>
+            <span className="hidden md:inline-flex items-center gap-2 font-bold text-heading">
+              <BrandMark className="h-6 w-6" />
+              SalesHub POS
+            </span>
           </div>
           <div className="flex items-center gap-2 sm:gap-4 shrink-0">
             <div className={`flex items-center gap-1.5 text-sm ${online ? 'text-success' : 'text-error'}`}>

@@ -1,4 +1,5 @@
 import { useAuth } from '../context/AuthContext'
+import BrandMark from './BrandMark'
 
 export default function TenantSelector() {
   const { tenants, selectTenant, loading } = useAuth()
@@ -15,7 +16,8 @@ export default function TenantSelector() {
     <div className="min-h-screen flex items-center justify-center bg-background p-4 font-sans">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-heading">Hardware Shop POS</h1>
+          <BrandMark className="h-14 w-14 mx-auto" />
+          <h1 className="text-2xl font-bold text-heading mt-3">SalesHub POS</h1>
           <p className="text-text mt-1">Choose which shop to open</p>
         </div>
 

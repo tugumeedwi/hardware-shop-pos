@@ -38,7 +38,7 @@ export default function Receipt({ saleId, onClose }) {
   }
 const handleThermalPrint = () => {
   const receiptData = {
-    title: 'Hardware Shop',
+    title: 'SalesHub POS',
     items: items.map(it => ({
       name: it.products?.name || 'Product',
       quantity_sold: it.quantity_sold,

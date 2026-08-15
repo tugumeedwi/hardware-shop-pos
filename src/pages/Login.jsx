@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { supabase } from '../api/supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import { Navigate, Link } from 'react-router-dom'
+import BrandMark from '../components/BrandMark'
 
 export default function Login() {
   const { session } = useAuth()
@@ -43,7 +44,8 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center bg-background font-sans p-4">
       <form onSubmit={handleLogin} className="bg-card border border-border rounded-2xl shadow-xl p-8 w-full max-w-md space-y-5">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-heading">Hardware Shop</h1>
+          <BrandMark className="h-14 w-14 mx-auto" />
+          <h1 className="text-2xl font-bold text-heading mt-3">SalesHub POS</h1>
           <p className="text-text mt-1">Sign in to your account</p>
         </div>
         {error && (

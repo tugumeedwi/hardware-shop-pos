@@ -13,8 +13,8 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,ico,png,svg}']
       },
       manifest: {
-        name: 'Hardware Shop POS',
-        short_name: 'HW-POS',
+        name: 'SalesHub POS',
+        short_name: 'SalesHub',
         description: 'Offline-first point of sale for hardware and phone shops',
         start_url: '/',
         display: 'standalone',
