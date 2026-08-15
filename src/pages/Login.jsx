@@ -134,6 +134,17 @@ export default function Login() {
           <Link to="/register" className="text-primary hover:underline font-medium">Create a shop</Link>
         </p>
       </form>
+      <p className="text-center text-xs text-text mt-4">
+        Developer:{' '}
+        <a
+          href="https://tugumeedwi.github.io/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-primary hover:underline font-medium"
+        >
+          Tugume Edwi Millenium
+        </a>
+      </p>
     </div>
   )
 }

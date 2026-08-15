@@ -16,6 +16,7 @@ export default defineConfig({
         name: 'SalesHub POS',
         short_name: 'SalesHub',
         description: 'Offline-first point of sale for hardware and phone shops',
+        author: 'Tugume Edwi Millenium',
         start_url: '/',
         display: 'standalone',
         background_color: '#f8fafc',

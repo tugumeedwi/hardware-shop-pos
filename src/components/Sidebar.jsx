@@ -147,6 +147,17 @@ export default function Sidebar({ open, onClose, isOwner, isPlatformAdmin }) {
 
         <div className="px-4 py-4 border-t border-sidebar-text/10 shrink-0">
           <p className="text-[11px] text-sidebar-text/60">SalesHub POS · v1.0</p>
+          <p className="text-[11px] text-sidebar-text/60 mt-0.5">
+            Developer:{' '}
+            <a
+              href="https://tugumeedwi.github.io/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary-light hover:underline"
+            >
+              Tugume Edwi Millenium
+            </a>
+          </p>
         </div>
       </aside>
     </>
