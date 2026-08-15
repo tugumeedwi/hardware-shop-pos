@@ -81,11 +81,35 @@ export default function POS() {
   })
 
   // ---- network listeners ----
+  const loadProducts = useCallback(async () => {
+    if (navigator.onLine) {
+      const { data } = await supabase.from('products').select('*').eq('is_deleted', false)
+      if (data && data.length > 0) {
+        try {
+          await db.products.clear()
+          await db.products.bulkPut(data)
+        } catch (e) {
+          console.warn('Local DB update failed, resetting…', e)
+          await db.delete()
+          location.reload()
+        }
+        setProducts(data)
+        return
+      }
+    }
+    const localProducts = await db.products.toArray()
+    setProducts(localProducts)
+  }, [])
+
+  const handleOnline = useCallback(() => { setIsOffline(false); loadProducts() }, [loadProducts])
+  const handleOffline = useCallback(() => setIsOffline(true), [])
+
   useEffect(() => {
-    loadProducts()
+    const t = setTimeout(loadProducts, 0)
     window.addEventListener('online', handleOnline)
     window.addEventListener('offline', handleOffline)
     return () => {
+      clearTimeout(t)
       window.removeEventListener('online', handleOnline)
       window.removeEventListener('offline', handleOffline)
     }
@@ -179,29 +203,6 @@ export default function POS() {
   useRealtimeSubscription('products', () => {
     loadProducts()
   })
-
-  const handleOnline = useCallback(() => { setIsOffline(false); loadProducts() }, [loadProducts])
-  const handleOffline = useCallback(() => setIsOffline(true), [])
-
-  const loadProducts = useCallback(async () => {
-    if (navigator.onLine) {
-      const { data } = await supabase.from('products').select('*').eq('is_deleted', false)
-      if (data && data.length > 0) {
-        try {
-          await db.products.clear()
-          await db.products.bulkPut(data)
-        } catch (e) {
-          console.warn('Local DB update failed, resetting…', e)
-          await db.delete()
-          location.reload()
-        }
-        setProducts(data)
-        return
-      }
-    }
-    const localProducts = await db.products.toArray()
-    setProducts(localProducts)
-  }, [])
 
   const filteredProducts = products.filter(p =>
     p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
