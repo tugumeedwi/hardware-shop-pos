@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect } from 'react'
+import { lazy, Suspense, useEffect, Component } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import Layout from './components/Layout'
@@ -29,10 +29,75 @@ const AdminPayments = lazy(() => import('./pages/AdminPayments'))
 
 function PageFallback() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-zinc-50 font-sans">
-      <div className="text-zinc-500">Loading...</div>
+    <div className="min-h-screen flex items-center justify-center bg-background font-sans">
+      <div className="text-text">Loading...</div>
     </div>
   )
+}
+
+// Catches failures to load a lazy route chunk (e.g. a stale service-worker
+// cache after a deploy serving HTML for a missing JS chunk) and shows a clear
+// retry instead of a blank white page.
+class PageErrorBoundary extends Component {
+  constructor(props) {
+    super(props)
+    this.state = { hasError: false }
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true }
+  }
+
+  componentDidCatch(error, info) {
+    console.error('Page load failed:', error, info)
+    // Auto-recover once per session: a failed lazy chunk is almost always a
+    // stale service-worker cache serving chunk URLs that no longer exist after
+    // a rebuild. Clear it and reload so the fresh build loads on its own.
+    if (typeof sessionStorage !== 'undefined' && !sessionStorage.getItem('posAutoRecovered')) {
+      sessionStorage.setItem('posAutoRecovered', '1')
+      this.handleReload()
+    }
+  }
+
+  handleReload = async () => {
+    this.setState({ hasError: false })
+    // The most common cause of a failed lazy chunk is a stale service worker
+    // serving an old cached bundle whose chunk URLs no longer exist. Clear
+    // it (plus caches) before reloading so the fresh build is fetched.
+    try {
+      if ('serviceWorker' in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations()
+        await Promise.all(registrations.map((reg) => reg.unregister()))
+      }
+      if (window.caches) {
+        const keys = await window.caches.keys()
+        await Promise.all(keys.map((key) => window.caches.delete(key)))
+      }
+    } catch {
+      /* ignore — reload regardless */
+    }
+    window.location.reload()
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center">
+          <p className="font-semibold text-heading">This page failed to load</p>
+          <p className="text-sm text-text mt-1 mb-4">
+            A connection hiccup or a stale app cache may be the cause.
+          </p>
+          <button
+            onClick={this.handleReload}
+            className="bg-primary hover:bg-primary-hover text-white font-semibold px-4 py-2 rounded-xl transition-colors"
+          >
+            Reload page
+          </button>
+        </div>
+      )
+    }
+    return this.props.children
+  }
 }
 
 function PrivateRoute({ children, roleRequired }) {
@@ -85,8 +150,8 @@ function AppInner() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-zinc-50 font-sans">
-        <div className="text-zinc-500">Loading...</div>
+      <div className="min-h-screen flex items-center justify-center bg-background font-sans">
+        <div className="text-text">Loading...</div>
       </div>
     )
   }
@@ -100,27 +165,29 @@ function AppInner() {
 
   return (
     <Layout>
-      <Suspense fallback={<PageFallback />}>
-        <Routes>
-          <Route path="/pos" element={<PrivateRoute><POS /></PrivateRoute>} />
-          <Route path="/products" element={<PrivateRoute roleRequired="owner"><Products /></PrivateRoute>} />
-          <Route path="/customers" element={<PrivateRoute roleRequired="owner"><Customers /></PrivateRoute>} />
-          <Route path="/quotations" element={<PrivateRoute><Quotations /></PrivateRoute>} />
-          <Route path="/quotations/new" element={<PrivateRoute><QuotationForm /></PrivateRoute>} />
-          <Route path="/sales" element={<PrivateRoute><SalesHistory /></PrivateRoute>} />
-          <Route path="/conflicts" element={<PrivateRoute roleRequired="owner"><SyncConflicts /></PrivateRoute>} />
-          <Route path="/users" element={<PrivateRoute roleRequired="owner"><UserManagement /></PrivateRoute>} />
-          <Route path="/settings" element={<PrivateRoute roleRequired="owner"><Settings /></PrivateRoute>} />
-          <Route path="/tax-settings" element={<PrivateRoute roleRequired="owner"><TaxSettings /></PrivateRoute>} />
-          <Route path="/payments" element={<PrivateRoute><Payments /></PrivateRoute>} />
-          <Route path="/pricing" element={<PrivateRoute roleRequired="owner"><Pricing /></PrivateRoute>} />
-          <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
-          <Route path="/expenses" element={<PrivateRoute roleRequired="owner"><Expenses /></PrivateRoute>} />
-          <Route path="/activity" element={<PrivateRoute roleRequired="owner"><ActivityLog /></PrivateRoute>} />
-          <Route path="/admin/payments" element={<PrivateRoute roleRequired="platform_admin"><AdminPayments /></PrivateRoute>} />
-          <Route path="*" element={<Navigate to={isPlatformAdmin ? '/admin/payments' : '/pos'} />} />
-        </Routes>
-      </Suspense>
+      <PageErrorBoundary>
+        <Suspense fallback={<PageFallback />}>
+          <Routes>
+            <Route path="/pos" element={<PrivateRoute><POS /></PrivateRoute>} />
+            <Route path="/products" element={<PrivateRoute roleRequired="owner"><Products /></PrivateRoute>} />
+            <Route path="/customers" element={<PrivateRoute roleRequired="owner"><Customers /></PrivateRoute>} />
+            <Route path="/quotations" element={<PrivateRoute><Quotations /></PrivateRoute>} />
+            <Route path="/quotations/new" element={<PrivateRoute><QuotationForm /></PrivateRoute>} />
+            <Route path="/sales" element={<PrivateRoute><SalesHistory /></PrivateRoute>} />
+            <Route path="/conflicts" element={<PrivateRoute roleRequired="owner"><SyncConflicts /></PrivateRoute>} />
+            <Route path="/users" element={<PrivateRoute roleRequired="owner"><UserManagement /></PrivateRoute>} />
+            <Route path="/settings" element={<PrivateRoute roleRequired="owner"><Settings /></PrivateRoute>} />
+            <Route path="/tax-settings" element={<PrivateRoute roleRequired="owner"><TaxSettings /></PrivateRoute>} />
+            <Route path="/payments" element={<PrivateRoute><Payments /></PrivateRoute>} />
+            <Route path="/pricing" element={<PrivateRoute roleRequired="owner"><Pricing /></PrivateRoute>} />
+            <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
+            <Route path="/expenses" element={<PrivateRoute roleRequired="owner"><Expenses /></PrivateRoute>} />
+            <Route path="/activity" element={<PrivateRoute roleRequired="owner"><ActivityLog /></PrivateRoute>} />
+            <Route path="/admin/payments" element={<PrivateRoute roleRequired="platform_admin"><AdminPayments /></PrivateRoute>} />
+            <Route path="*" element={<Navigate to={isPlatformAdmin ? '/admin/payments' : '/pos'} />} />
+          </Routes>
+        </Suspense>
+      </PageErrorBoundary>
     </Layout>
   )
 }

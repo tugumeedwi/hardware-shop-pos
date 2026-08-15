@@ -1,5 +1,49 @@
 @import "tailwindcss";
 
+@theme {
+  /* ===== Core ===== */
+  --color-background: #F8FAFC;
+  --color-surface: #F1F5F9;
+  --color-card: #FFFFFF;
+  --color-heading: #0F172A;
+  --color-text: #64748B;
+  --color-text-strong: #334155;
+  --color-text-muted: #94A3B8;
+  --color-border: #E2E8F0;
+  --color-border-dark: #CBD5E1;
+
+  /* ===== Brand ===== */
+  --color-primary: #2563EB;
+  --color-primary-hover: #1D4ED8;
+  --color-primary-light: #DBEAFE;
+  --color-primary-soft: #EFF6FF;
+
+  /* ===== Status ===== */
+  --color-success: #16A34A;
+  --color-success-hover: #15803D;
+  --color-success-strong: #15803D;
+  --color-success-soft: #DCFCE7;
+  --color-warning: #F59E0B;
+  --color-warning-strong: #B45309;
+  --color-warning-soft: #FEF3C7;
+  --color-error: #DC2626;
+  --color-error-strong: #B91C1C;
+  --color-error-soft: #FEE2E2;
+  --color-info: #0891B2;
+  --color-info-strong: #0E7490;
+  --color-info-soft: #CFFAFE;
+
+  /* ===== Dark secondary buttons ===== */
+  --color-ink: #334155;
+  --color-ink-hover: #1E293B;
+  --color-ink-dark: #0F172A;
+
+  /* ===== Sidebar ===== */
+  --color-sidebar: #0F172A;
+  --color-sidebar-text: #CBD5E1;
+  --color-sidebar-active: #2563EB;
+}
+
 /* Print styles */
 @media print {
   body * {

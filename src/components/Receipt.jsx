@@ -78,22 +78,22 @@ const handleThermalPrint = () => {
   // Print-specific CSS will be in index.css (we'll add it next)
 
   return (
-    <div className="receipt-container bg-white max-w-3xl mx-auto p-6 print:shadow-none print:p-0">
+    <div className="receipt-container bg-card max-w-3xl mx-auto p-6 print:shadow-none print:p-0">
       {/* Print/Close buttons (hidden in print) */}
       <div className="flex justify-end gap-2 mb-4 print:hidden">
-        <button onClick={handlePrint} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+        <button onClick={handlePrint} className="bg-primary text-white px-4 py-2 rounded hover:bg-primary-hover">
           Print / Save PDF
         </button>
 {thermalReady && (
   <button
     onClick={handleThermalPrint}
-    className="bg-gray-700 text-white px-4 py-2 rounded hover:bg-gray-800"
+    className="bg-ink-hover text-white px-4 py-2 rounded hover:bg-sidebar"
   >
     Print Thermal
   </button>
 )}
         {onClose && (
-          <button onClick={onClose} className="bg-gray-300 px-4 py-2 rounded hover:bg-gray-400">
+          <button onClick={onClose} className="bg-border-dark px-4 py-2 rounded hover:bg-text-muted">
             Close
           </button>
         )} 
@@ -126,7 +126,7 @@ const handleThermalPrint = () => {
         {/* Items table */}
         <table className="w-full border-collapse mb-4 text-xs sm:text-sm">
           <thead>
-            <tr className="border-b-2 border-gray-300">
+            <tr className="border-b-2 border-border-dark">
               <th className="text-left py-1">Product</th>
               <th className="text-center py-1">Unit</th>
               <th className="text-center py-1">Qty</th>
@@ -136,7 +136,7 @@ const handleThermalPrint = () => {
           </thead>
           <tbody>
             {items.map((item, idx) => (
-              <tr key={idx} className="border-b border-gray-200">
+              <tr key={idx} className="border-b border-border">
                 <td className="py-1">{item.products?.name || 'Product'}</td>
                 <td className="text-center py-1">{item.selling_unit}</td>
                 <td className="text-center py-1">{item.quantity_sold}</td>
@@ -158,7 +158,7 @@ const handleThermalPrint = () => {
               <span>Discount:</span>
               <span>-{sale.discount_total.toFixed(2)}</span>
             </div>
-            <div className="flex justify-between font-bold text-base border-t border-gray-400 pt-1">
+            <div className="flex justify-between font-bold text-base border-t border-border-dark pt-1">
               <span>NET TOTAL:</span>
               <span>{sale.total_amount.toFixed(2)}</span>
             </div>

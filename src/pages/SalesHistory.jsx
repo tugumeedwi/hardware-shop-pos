@@ -94,26 +94,26 @@ export default function SalesHistory() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 p-4 font-sans">
-      <h1 className="text-2xl font-bold text-zinc-800 mb-6">Sales History</h1>
+    <div className="min-h-screen bg-background p-4 font-sans">
+      <h1 className="text-2xl font-bold text-heading mb-6">Sales History</h1>
 
       {/* Filters */}
-      <div className="bg-white border border-zinc-200 rounded-2xl shadow-sm p-5 mb-6">
+      <div className="bg-card border border-border rounded-2xl shadow-sm p-5 mb-6">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
           <div>
-            <label className="text-xs font-medium text-zinc-500">From</label>
+            <label className="text-xs font-medium text-text">From</label>
             <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)}
-              className="w-full border border-zinc-300 rounded-xl px-3 py-2.5 mt-1 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400" />
+              className="w-full border border-border-dark rounded-xl px-3 py-2.5 mt-1 bg-card focus:outline-none focus:ring-2 focus:ring-primary" />
           </div>
           <div>
-            <label className="text-xs font-medium text-zinc-500">To</label>
+            <label className="text-xs font-medium text-text">To</label>
             <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)}
-              className="w-full border border-zinc-300 rounded-xl px-3 py-2.5 mt-1 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400" />
+              className="w-full border border-border-dark rounded-xl px-3 py-2.5 mt-1 bg-card focus:outline-none focus:ring-2 focus:ring-primary" />
           </div>
           <div>
-            <label className="text-xs font-medium text-zinc-500">Payment</label>
+            <label className="text-xs font-medium text-text">Payment</label>
             <select value={paymentFilter} onChange={(e) => setPaymentFilter(e.target.value)}
-              className="w-full border border-zinc-300 rounded-xl px-3 py-2.5 mt-1 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400">
+              className="w-full border border-border-dark rounded-xl px-3 py-2.5 mt-1 bg-card focus:outline-none focus:ring-2 focus:ring-primary">
               <option value="all">All</option>
               <option value="cash">Cash</option>
               <option value="mobile_money">Mobile Money</option>
@@ -121,11 +121,11 @@ export default function SalesHistory() {
             </select>
           </div>
           <div>
-            <label className="text-xs font-medium text-zinc-500">Customer / Sale ID</label>
+            <label className="text-xs font-medium text-text">Customer / Sale ID</label>
             <div className="flex gap-2 mt-1">
               <input type="text" value={customerFilter} onChange={(e) => setCustomerFilter(e.target.value)}
-                placeholder="Name, phone, ID" className="flex-1 border border-zinc-300 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400" />
-              <button onClick={applyCustomerFilter} className="bg-zinc-700 hover:bg-zinc-800 text-white px-4 py-2.5 rounded-xl font-medium transition-colors">Filter</button>
+                placeholder="Name, phone, ID" className="flex-1 border border-border-dark rounded-xl px-3 py-2.5 bg-card focus:outline-none focus:ring-2 focus:ring-primary" />
+              <button onClick={applyCustomerFilter} className="bg-ink hover:bg-ink-hover text-white px-4 py-2.5 rounded-xl font-medium transition-colors">Filter</button>
             </div>
           </div>
         </div>
@@ -133,64 +133,64 @@ export default function SalesHistory() {
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white border border-zinc-200 rounded-2xl shadow-sm p-4 text-center">
-          <span className="text-sm text-zinc-500">Total Sales</span>
-          <p className="text-xl font-bold text-zinc-800">{totals.total.toFixed(2)}</p>
+        <div className="bg-card border border-border rounded-2xl shadow-sm p-4 text-center">
+          <span className="text-sm text-text">Total Sales</span>
+          <p className="text-xl font-bold text-heading">{totals.total.toFixed(2)}</p>
         </div>
-        <div className="bg-white border border-zinc-200 rounded-2xl shadow-sm p-4 text-center">
-          <span className="text-sm text-zinc-500">Cash</span>
-          <p className="text-xl font-bold text-emerald-600">{totals.cash.toFixed(2)}</p>
+        <div className="bg-card border border-border rounded-2xl shadow-sm p-4 text-center">
+          <span className="text-sm text-text">Cash</span>
+          <p className="text-xl font-bold text-success">{totals.cash.toFixed(2)}</p>
         </div>
-        <div className="bg-white border border-zinc-200 rounded-2xl shadow-sm p-4 text-center">
-          <span className="text-sm text-zinc-500">Mobile Money</span>
-          <p className="text-xl font-bold text-blue-600">{totals.mobile_money.toFixed(2)}</p>
+        <div className="bg-card border border-border rounded-2xl shadow-sm p-4 text-center">
+          <span className="text-sm text-text">Mobile Money</span>
+          <p className="text-xl font-bold text-success">{totals.mobile_money.toFixed(2)}</p>
         </div>
-        <div className="bg-white border border-zinc-200 rounded-2xl shadow-sm p-4 text-center">
-          <span className="text-sm text-zinc-500">Credit</span>
+        <div className="bg-card border border-border rounded-2xl shadow-sm p-4 text-center">
+          <span className="text-sm text-text">Credit</span>
           <p className="text-xl font-bold text-red-600">{totals.credit.toFixed(2)}</p>
         </div>
       </div>
 
       {/* Sales table */}
-      <div className="bg-white border border-zinc-200 rounded-2xl shadow-sm overflow-hidden mb-6">
+      <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden mb-6">
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">
-            <thead className="bg-zinc-50 border-b border-zinc-200">
+            <thead className="bg-background border-b border-border">
               <tr>
-                <th className="px-4 py-3 text-left font-medium text-zinc-600">Date</th>
-                <th className="px-4 py-3 text-left font-medium text-zinc-600">Customer</th>
-                <th className="px-4 py-3 text-left font-medium text-zinc-600">Payment</th>
-                <th className="px-4 py-3 text-right font-medium text-zinc-600">Total</th>
-                <th className="px-4 py-3 text-center font-medium text-zinc-600">Receipt</th>
+                <th className="px-4 py-3 text-left font-medium text-text">Date</th>
+                <th className="px-4 py-3 text-left font-medium text-text">Customer</th>
+                <th className="px-4 py-3 text-left font-medium text-text">Payment</th>
+                <th className="px-4 py-3 text-right font-medium text-text">Total</th>
+                <th className="px-4 py-3 text-center font-medium text-text">Receipt</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-100">
+            <tbody className="divide-y divide-border">
               {sales.map(s => (
-                <tr key={s.id} className="hover:bg-zinc-50 transition-colors">
-                  <td className="px-4 py-3 text-zinc-700">{new Date(s.created_at).toLocaleString()}</td>
-                  <td className="px-4 py-3 font-medium text-zinc-800">{s.customers?.name || 'Walk-in'}</td>
-                  <td className="px-4 py-3 text-zinc-600 capitalize">{s.payment_method?.replace('_', ' ')}</td>
-                  <td className="px-4 py-3 text-right text-zinc-700">{s.total_amount.toFixed(2)}</td>
+                <tr key={s.id} className="hover:bg-background transition-colors">
+                  <td className="px-4 py-3 text-text-strong">{new Date(s.created_at).toLocaleString()}</td>
+                  <td className="px-4 py-3 font-medium text-heading">{s.customers?.name || 'Walk-in'}</td>
+                  <td className="px-4 py-3 text-text capitalize">{s.payment_method?.replace('_', ' ')}</td>
+                  <td className="px-4 py-3 text-right text-text-strong">{s.total_amount.toFixed(2)}</td>
                   <td className="px-4 py-3 text-center">
-                    <button onClick={() => setViewReceiptId(s.id)} className="text-emerald-600 hover:text-emerald-700 font-medium transition-colors">View</button>
+                    <button onClick={() => setViewReceiptId(s.id)} className="text-primary hover:text-primary-hover font-medium transition-colors">View</button>
                   </td>
                 </tr>
               ))}
               {sales.length === 0 && !loading && (
-                <tr><td colSpan={5} className="px-4 py-8 text-center text-zinc-400">No sales found.</td></tr>
+                <tr><td colSpan={5} className="px-4 py-8 text-center text-text-muted">No sales found.</td></tr>
               )}
             </tbody>
           </table>
         </div>
       </div>
 
-      <button onClick={exportCSV} className="bg-zinc-200 hover:bg-zinc-300 text-zinc-700 font-medium py-2.5 px-5 rounded-xl transition-colors">
+      <button onClick={exportCSV} className="bg-border hover:bg-border-dark text-text-strong font-medium py-2.5 px-5 rounded-xl transition-colors">
         Export CSV
       </button>
 
       {viewReceiptId && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl p-6">
+          <div className="bg-card w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl p-6">
             <Receipt saleId={viewReceiptId} onClose={() => setViewReceiptId(null)} />
           </div>
         </div>

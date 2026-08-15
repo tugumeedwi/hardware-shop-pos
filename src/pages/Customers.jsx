@@ -5,11 +5,11 @@ import { useRealtimeSubscription } from '../hooks/useRealtime'
 import { logActivity } from '../utils/activityLogger'
 import { normalisePhone, formatPhone } from '../utils/phoneUtils'
 
-const inputClass = 'border border-zinc-300 rounded-xl px-4 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400'
+const inputClass = 'border border-border-dark rounded-xl px-4 py-2.5 bg-card focus:outline-none focus:ring-2 focus:ring-primary'
 
 const Field = ({ label, required, children }) => (
   <label className="block">
-    <span className="block text-sm font-medium text-zinc-600 mb-1">
+    <span className="block text-sm font-medium text-text mb-1">
       {label} {required && <span className="text-red-500">*</span>}
     </span>
     {children}
@@ -104,15 +104,15 @@ export default function Customers() {
     }
   }
 
-  if (loading) return <div className="p-8 text-center text-zinc-500">Loading customers...</div>
+  if (loading) return <div className="p-8 text-center text-text">Loading customers...</div>
 
   return (
-    <div className="min-h-screen bg-zinc-50 p-4 font-sans">
-      <h1 className="text-2xl font-bold text-zinc-800 mb-6">Customer Management</h1>
+    <div className="min-h-screen bg-background p-4 font-sans">
+      <h1 className="text-2xl font-bold text-heading mb-6">Customer Management</h1>
 
       {/* Form card */}
-      <form onSubmit={handleSave} className="bg-white border border-zinc-200 rounded-2xl shadow-sm p-6 mb-8 max-w-2xl">
-        <h2 className="text-lg font-semibold text-zinc-800 mb-4">{editing ? 'Edit Customer' : 'Add New Customer'}</h2>
+      <form onSubmit={handleSave} className="bg-card border border-border rounded-2xl shadow-sm p-6 mb-8 max-w-2xl">
+        <h2 className="text-lg font-semibold text-heading mb-4">{editing ? 'Edit Customer' : 'Add New Customer'}</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Field label="Full Name" required>
             <input type="text" placeholder="e.g. John Mukasa" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputClass + ' w-full'} required />
@@ -128,46 +128,46 @@ export default function Customers() {
           </Field>
         </div>
         <div className="flex gap-3 mt-6">
-          <button type="submit" className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 px-6 rounded-xl transition-colors shadow-sm">
+          <button type="submit" className="bg-primary hover:bg-primary-hover text-white font-semibold py-2.5 px-6 rounded-xl transition-colors shadow-sm">
             {editing ? 'Update' : 'Add Customer'}
           </button>
-          {editing && <button type="button" onClick={resetForm} className="bg-zinc-200 hover:bg-zinc-300 text-zinc-700 font-medium py-2.5 px-6 rounded-xl transition-colors">Cancel</button>}
+          {editing && <button type="button" onClick={resetForm} className="bg-border hover:bg-border-dark text-text-strong font-medium py-2.5 px-6 rounded-xl transition-colors">Cancel</button>}
         </div>
       </form>
 
       {/* Customer table */}
-      <div className="bg-white border border-zinc-200 rounded-2xl shadow-sm overflow-hidden">
+      <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">
-            <thead className="bg-zinc-50 border-b border-zinc-200">
+            <thead className="bg-background border-b border-border">
               <tr>
-                <th className="px-4 py-3 text-left font-medium text-zinc-600">Name</th>
-                <th className="px-4 py-3 text-left font-medium text-zinc-600">Phone</th>
-                <th className="px-4 py-3 text-right font-medium text-zinc-600">Credit Limit</th>
-                <th className="px-4 py-3 text-right font-medium text-zinc-600">Balance</th>
-                <th className="px-4 py-3 text-center font-medium text-zinc-600">Actions</th>
+                <th className="px-4 py-3 text-left font-medium text-text">Name</th>
+                <th className="px-4 py-3 text-left font-medium text-text">Phone</th>
+                <th className="px-4 py-3 text-right font-medium text-text">Credit Limit</th>
+                <th className="px-4 py-3 text-right font-medium text-text">Balance</th>
+                <th className="px-4 py-3 text-center font-medium text-text">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-100">
+            <tbody className="divide-y divide-border">
               {customers.map(c => (
-                <tr key={c.id} className="hover:bg-zinc-50 transition-colors">
-                  <td className="px-4 py-3 font-medium text-zinc-800">{c.name}</td>
-                  <td className="px-4 py-3 text-zinc-600">{formatPhone(c.phone) || '-'}</td>
-                  <td className="px-4 py-3 text-right text-zinc-600">{(c.credit_limit || 0).toFixed(2)}</td>
-                  <td className={`px-4 py-3 text-right font-medium ${(c.current_credit_balance || 0) > (c.credit_limit || 0) ? 'text-red-600' : 'text-zinc-800'}`}>
+                <tr key={c.id} className="hover:bg-background transition-colors">
+                  <td className="px-4 py-3 font-medium text-heading">{c.name}</td>
+                  <td className="px-4 py-3 text-text">{formatPhone(c.phone) || '-'}</td>
+                  <td className="px-4 py-3 text-right text-text">{(c.credit_limit || 0).toFixed(2)}</td>
+                  <td className={`px-4 py-3 text-right font-medium ${(c.current_credit_balance || 0) > (c.credit_limit || 0) ? 'text-red-600' : 'text-heading'}`}>
                     {(c.current_credit_balance || 0).toFixed(2)}
                     {(c.current_credit_balance || 0) > (c.credit_limit || 0) && (
                       <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-700">OVER LIMIT</span>
                     )}
                   </td>
                   <td className="px-4 py-3 text-center">
-                    <button onClick={() => editCustomer(c)} className="text-emerald-600 hover:text-emerald-700 font-medium mr-3 transition-colors">Edit</button>
+                    <button onClick={() => editCustomer(c)} className="text-primary hover:text-primary-hover font-medium mr-3 transition-colors">Edit</button>
                     <button onClick={() => handleDelete(c.id)} className="text-red-500 hover:text-red-600 font-medium transition-colors">Delete</button>
                   </td>
                 </tr>
               ))}
               {customers.length === 0 && (
-                <tr><td colSpan={5} className="px-4 py-8 text-center text-zinc-400">No customers found.</td></tr>
+                <tr><td colSpan={5} className="px-4 py-8 text-center text-text-muted">No customers found.</td></tr>
               )}
             </tbody>
           </table>

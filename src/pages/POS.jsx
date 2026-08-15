@@ -432,7 +432,7 @@ export default function POS() {
   }, [paymentMethod, totalAfterDiscount])
 
   return (
-    <div className="min-h-screen bg-zinc-50 p-4 font-sans">
+    <div className="min-h-screen bg-background p-4 font-sans">
       {/* Offline banner */}
       {isOffline && (
         <div className="bg-amber-50 border border-amber-200 text-amber-800 p-3 mb-6 rounded-xl text-center font-medium">
@@ -449,8 +449,8 @@ export default function POS() {
 
       {/* Scanning indicator – shows while the keyboard wedge is buffering */}
       {scannerActive && (
-        <div className="fixed bottom-5 right-5 z-40 flex items-center gap-2 bg-zinc-900/90 text-white text-sm font-medium px-4 py-2.5 rounded-full shadow-xl animate-pulse">
-          <svg className="h-4 w-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="fixed bottom-5 right-5 z-40 flex items-center gap-2 bg-sidebar/90 text-white text-sm font-medium px-4 py-2.5 rounded-full shadow-xl animate-pulse">
+          <svg className="h-4 w-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6M7 4H5a2 2 0 00-2 2v2m0 8v2a2 2 0 002 2h2m8-16h2a2 2 0 012 2v2m0 8v2a2 2 0 01-2 2h-2" />
           </svg>
           Scanning…
@@ -459,14 +459,14 @@ export default function POS() {
 
       {/* Mobile camera scanner modal */}
       {cameraOpen && (
-        <div className="fixed inset-0 z-50 bg-zinc-900/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl p-5 w-full max-w-md">
+        <div className="fixed inset-0 z-50 bg-sidebar/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-card rounded-2xl shadow-2xl p-5 w-full max-w-md">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-zinc-800">Scan Barcode</h3>
-              <button onClick={() => setCameraOpen(false)} className="text-zinc-400 hover:text-zinc-600 text-xl leading-none">✕</button>
+              <h3 className="text-lg font-bold text-heading">Scan Barcode</h3>
+              <button onClick={() => setCameraOpen(false)} className="text-text-muted hover:text-text text-xl leading-none">✕</button>
             </div>
-            <div id={cameraRegionId} className="w-full aspect-square bg-zinc-900 rounded-xl overflow-hidden" />
-            <p className="text-xs text-zinc-500 mt-3 text-center">
+            <div id={cameraRegionId} className="w-full aspect-square bg-sidebar rounded-xl overflow-hidden" />
+            <p className="text-xs text-text mt-3 text-center">
               Point the camera at a product barcode or QR code.
             </p>
           </div>
@@ -485,15 +485,15 @@ export default function POS() {
                 placeholder="Search products by name or SKU..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 bg-white border border-zinc-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-zinc-800 placeholder-zinc-400"
+                className="w-full pl-10 pr-4 py-3 bg-card border border-border rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-primary text-heading placeholder-text-muted"
               />
-              <svg className="absolute left-3 top-3.5 h-5 w-5 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="absolute left-3 top-3.5 h-5 w-5 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
             </div>
             <button
               onClick={() => setCameraOpen(true)}
-              className="inline-flex items-center gap-2 bg-zinc-800 hover:bg-zinc-900 text-white font-medium px-4 py-3 rounded-xl transition-colors shadow-sm"
+              className="inline-flex items-center gap-2 bg-ink-hover hover:bg-sidebar text-white font-medium px-4 py-3 rounded-xl transition-colors shadow-sm"
             >
               <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
@@ -509,32 +509,32 @@ export default function POS() {
               <button
                 key={product.id}
                 onClick={() => addToCart(product)}
-                className="group relative bg-white border border-zinc-200 rounded-xl p-4 text-left shadow-sm hover:shadow-md hover:scale-[1.02] active:scale-100 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                className="group relative bg-card border border-border rounded-xl p-4 text-left shadow-sm hover:shadow-md hover:scale-[1.02] active:scale-100 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary"
               >
-                <div className="font-semibold text-zinc-800 text-sm leading-tight">{product.name}</div>
+                <div className="font-semibold text-heading text-sm leading-tight">{product.name}</div>
                 {product.attributes?.imei && (
                   <div className="mt-1 flex items-center gap-1">
-                    <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-zinc-100 text-zinc-600 truncate max-w-full">
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-surface text-text truncate max-w-full">
                       IMEI: {product.attributes.imei}
                     </span>
                   </div>
                 )}
                 <div className="flex items-center justify-between mt-1">
-                  <span className="text-xs text-zinc-500">Stock: {product.stock_quantity}</span>
+                  <span className="text-xs text-text">Stock: {product.stock_quantity}</span>
                   {product.stock_quantity <= (product.low_stock_threshold || 10) && (
                     <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-700 animate-pulse">
                       LOW
                     </span>
                   )}
                 </div>
-                <div className="mt-2 text-xs font-bold text-zinc-700">
+                <div className="mt-2 text-xs font-bold text-text-strong">
                   {product.active_pricing_methods?.[0] === 'piece' && `Pc: ${product.price_per_piece}`}
                   {product.active_pricing_methods?.[0] === 'box' && `Box: ${product.price_per_box}`}
                   {product.active_pricing_methods?.[0] === 'sqm' && `Sqm: ${product.price_per_sqm}`}
                   {product.active_pricing_methods?.[0] === 'kg' && `Kg: ${product.price_per_kg}`}
                 </div>
                 {/* subtle accent hover line */}
-                <div className="absolute inset-x-0 bottom-0 h-1 bg-emerald-500 rounded-b-xl opacity-0 group-hover:opacity-100 transition-opacity" />
+                <div className="absolute inset-x-0 bottom-0 h-1 bg-primary rounded-b-xl opacity-0 group-hover:opacity-100 transition-opacity" />
               </button>
             ))}
           </div>
@@ -542,11 +542,11 @@ export default function POS() {
 
         {/* Checkout sidebar – glassmorphism */}
         <div className="lg:col-span-1">
-          <div className="sticky top-6 bg-white/80 backdrop-blur-sm border border-zinc-200 rounded-2xl shadow-xl p-5 space-y-4">
+          <div className="sticky top-6 bg-card/80 backdrop-blur-sm border border-border rounded-2xl shadow-xl p-5 space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-xl font-bold text-zinc-800">Checkout</h2>
+              <h2 className="text-xl font-bold text-heading">Checkout</h2>
               <span className={`inline-flex items-center justify-center min-w-[1.75rem] h-7 px-2 rounded-full text-xs font-bold ${
-                cart.length > 0 ? 'bg-emerald-600 text-white' : 'bg-zinc-200 text-zinc-500'
+                cart.length > 0 ? 'bg-primary text-white' : 'bg-border text-text'
               }`}>
                 {cart.length}
               </span>
@@ -555,20 +555,20 @@ export default function POS() {
             {/* Cart items */}
             <div className="max-h-64 overflow-y-auto space-y-3">
               {cart.map((item, index) => (
-                <div key={index} className="flex items-center justify-between bg-zinc-50 rounded-xl p-3 text-sm">
+                <div key={index} className="flex items-center justify-between bg-background rounded-xl p-3 text-sm">
                   <div className="flex-1">
-                    <p className="font-medium text-zinc-700 truncate">{item.product.name}</p>
+                    <p className="font-medium text-text-strong truncate">{item.product.name}</p>
                     {item.product.attributes?.imei && (
-                      <p className="text-[10px] text-zinc-400 truncate">IMEI: {item.product.attributes.imei}</p>
+                      <p className="text-[10px] text-text-muted truncate">IMEI: {item.product.attributes.imei}</p>
                     )}
                     <div className="flex items-center gap-2 mt-1">
                       {isPhoneProduct(item.product) ? (
-                        <span className="text-xs font-semibold text-zinc-500 bg-white border border-zinc-200 rounded-lg px-2 py-1">piece</span>
+                        <span className="text-xs font-semibold text-text bg-card border border-border rounded-lg px-2 py-1">piece</span>
                       ) : (
                         <select
                           value={item.sellingUnit}
                           onChange={(e) => updateCartItem(index, 'sellingUnit', e.target.value)}
-                          className="text-xs border border-zinc-300 rounded-lg px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                          className="text-xs border border-border-dark rounded-lg px-2 py-1 bg-card focus:outline-none focus:ring-1 focus:ring-primary"
                         >
                           {item.product.active_pricing_methods.map(unit => (
                             <option key={unit} value={unit}>{unit}</option>
@@ -584,41 +584,41 @@ export default function POS() {
                           if (isNaN(val) || val < 1) val = 1
                           updateCartItem(index, 'quantity', val)
                         }}
-                        className="w-14 text-xs border border-zinc-300 rounded-lg px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                        className="w-14 text-xs border border-border-dark rounded-lg px-2 py-1 bg-card focus:outline-none focus:ring-1 focus:ring-primary"
                       />
                     </div>
                   </div>
-                  <span className="font-semibold text-zinc-700 ml-2">{(item.quantity * item.unitPrice).toFixed(2)}</span>
+                  <span className="font-semibold text-text-strong ml-2">{(item.quantity * item.unitPrice).toFixed(2)}</span>
                   <button onClick={() => removeFromCart(index)} className="ml-2 text-red-400 hover:text-red-600 transition-colors">✕</button>
                 </div>
               ))}
               {cart.length === 0 && (
-                <div className="flex flex-col items-center justify-center py-8 text-zinc-400">
-                  <svg className="h-10 w-10 mb-2 text-zinc-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="flex flex-col items-center justify-center py-8 text-text-muted">
+                  <svg className="h-10 w-10 mb-2 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
                   </svg>
                   <p className="text-sm">Your cart is empty</p>
-                  <p className="text-xs text-zinc-400 mt-1">Scan a barcode or tap a product to add items.</p>
+                  <p className="text-xs text-text-muted mt-1">Scan a barcode or tap a product to add items.</p>
                 </div>
               )}
             </div>
 
             {/* Totals & discount */}
             <div className="space-y-2 text-sm">
-              <div className="flex justify-between text-zinc-600">
+              <div className="flex justify-between text-text">
                 <span>Subtotal</span>
                 <span>{totalBeforeDiscount.toFixed(2)}</span>
               </div>
               <div className="flex items-center gap-2">
-                <label className="text-zinc-600">Discount</label>
+                <label className="text-text">Discount</label>
                 <input
                   type="number"
                   value={discount}
                   onChange={(e) => setDiscount(e.target.value)}
-                  className="w-20 border border-zinc-300 rounded-lg px-2 py-1 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                  className="w-20 border border-border-dark rounded-lg px-2 py-1 text-sm bg-card focus:outline-none focus:ring-1 focus:ring-primary"
                 />
               </div>
-              <div className="flex justify-between text-zinc-800 font-bold text-lg border-t border-zinc-200 pt-2">
+              <div className="flex justify-between text-heading font-bold text-lg border-t border-border pt-2">
                 <span>Net Total</span>
                 <span>{totalAfterDiscount.toFixed(2)}</span>
               </div>
@@ -626,26 +626,26 @@ export default function POS() {
 
             {/* Customer section */}
             <div className="space-y-2">
-              <label className="text-sm font-medium text-zinc-600">Customer Phone</label>
+              <label className="text-sm font-medium text-text">Customer Phone</label>
               <div className="flex gap-2">
                 <input
                   type="text"
                   placeholder="07XX..."
                   value={customerPhoneInput}
                   onChange={(e) => { setCustomerPhoneInput(e.target.value); setCustomerLookupError('') }}
-                  className="flex-1 border border-zinc-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                  className="flex-1 border border-border-dark rounded-lg px-3 py-2 bg-card focus:outline-none focus:ring-1 focus:ring-primary"
                 />
-                <button onClick={lookupCustomer} className="bg-zinc-700 text-white px-3 py-2 rounded-lg text-sm hover:bg-zinc-800 transition-colors">Lookup</button>
+                <button onClick={lookupCustomer} className="bg-ink text-white px-3 py-2 rounded-lg text-sm hover:bg-ink-hover transition-colors">Lookup</button>
               </div>
               {customerLookupError && <p className="text-xs text-red-500">{customerLookupError}</p>}
               {selectedCustomer && (
-                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-2 text-sm">
-                  <p className="font-medium text-emerald-800">{selectedCustomer.name}</p>
-                  <p className="text-emerald-700 text-xs">Balance: {selectedCustomer.current_credit_balance.toFixed(2)} / Limit: {selectedCustomer.credit_limit.toFixed(2)}</p>
+                <div className="bg-primary-soft border border-primary-light rounded-xl p-2 text-sm">
+                  <p className="font-medium text-primary-hover">{selectedCustomer.name}</p>
+                  <p className="text-primary-hover text-xs">Balance: {selectedCustomer.current_credit_balance.toFixed(2)} / Limit: {selectedCustomer.credit_limit.toFixed(2)}</p>
                 </div>
               )}
               {customerLookupError && customerLookupError.includes('No customer found') && (
-                <button onClick={() => setShowQuickAddCustomer(!showQuickAddCustomer)} className="text-emerald-600 text-xs hover:underline">
+                <button onClick={() => setShowQuickAddCustomer(!showQuickAddCustomer)} className="text-primary text-xs hover:underline">
                   + Add new customer
                 </button>
               )}
@@ -656,9 +656,9 @@ export default function POS() {
                     placeholder="Customer name"
                     value={newCustomerName}
                     onChange={(e) => setNewCustomerName(e.target.value)}
-                    className="flex-1 border border-zinc-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                    className="flex-1 border border-border-dark rounded-lg px-3 py-2 text-sm bg-card focus:outline-none focus:ring-1 focus:ring-primary"
                   />
-                  <button onClick={quickAddCustomer} className="bg-emerald-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-emerald-700 transition-colors">Save</button>
+                  <button onClick={quickAddCustomer} className="bg-primary text-white px-3 py-2 rounded-lg text-sm hover:bg-primary-hover transition-colors">Save</button>
                 </div>
               )}
             </div>
@@ -667,7 +667,7 @@ export default function POS() {
             <select
               value={paymentMethod}
               onChange={(e) => setPaymentMethod(e.target.value)}
-              className="w-full border border-zinc-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-emerald-400"
+              className="w-full border border-border-dark rounded-lg px-3 py-2 bg-card focus:outline-none focus:ring-1 focus:ring-primary"
             >
               <option value="cash">Cash</option>
               <option value="mobile_money">Mobile Money</option>
@@ -679,7 +679,7 @@ export default function POS() {
                 placeholder="Amount Paid"
                 value={amountPaid}
                 onChange={(e) => setAmountPaid(e.target.value)}
-                className="w-full border border-zinc-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                className="w-full border border-border-dark rounded-lg px-3 py-2 bg-card focus:outline-none focus:ring-1 focus:ring-primary"
               />
             )}
 
@@ -687,7 +687,7 @@ export default function POS() {
             <button
               onClick={completeSale}
               disabled={processing || cart.length === 0}
-              className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3.5 rounded-xl transition-colors shadow-md hover:shadow-lg active:scale-[0.98]"
+              className="w-full bg-primary hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3.5 rounded-xl transition-colors shadow-md hover:shadow-lg active:scale-[0.98]"
             >
               {processing ? 'Processing...' : 'Complete Sale'}
             </button>

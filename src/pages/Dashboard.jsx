@@ -44,32 +44,32 @@ export default function Dashboard() {
   const profit = totalSales - expensesTotal
 
   return (
-    <div className="min-h-screen bg-zinc-50 p-4 font-sans">
-      <h1 className="text-2xl font-bold text-zinc-800 mb-6">Dashboard</h1>
+    <div className="min-h-screen bg-background p-4 font-sans">
+      <h1 className="text-2xl font-bold text-heading mb-6">Dashboard</h1>
 
       {/* Summary cards – Bento grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <div className="bg-white border border-zinc-200 rounded-2xl shadow-sm p-5 flex flex-col items-center">
-          <span className="text-sm text-zinc-500 font-medium">Total Sales</span>
-          <span className="text-2xl font-bold text-zinc-800 mt-1">{totalSales.toFixed(2)}</span>
+        <div className="bg-card border border-border rounded-2xl shadow-sm p-5 flex flex-col items-center">
+          <span className="text-sm text-text font-medium">Total Sales</span>
+          <span className="text-2xl font-bold text-heading mt-1">{totalSales.toFixed(2)}</span>
         </div>
-        <div className="bg-white border border-zinc-200 rounded-2xl shadow-sm p-5 flex flex-col items-center">
-          <span className="text-sm text-zinc-500 font-medium">Credit Outstanding</span>
+        <div className="bg-card border border-border rounded-2xl shadow-sm p-5 flex flex-col items-center">
+          <span className="text-sm text-text font-medium">Credit Outstanding</span>
           <span className="text-2xl font-bold text-red-600 mt-1">{creditOutstanding.toFixed(2)}</span>
         </div>
-        <div className="bg-white border border-zinc-200 rounded-2xl shadow-sm p-5 flex flex-col items-center">
-          <span className="text-sm text-zinc-500 font-medium">Expenses</span>
-          <span className="text-2xl font-bold text-zinc-800 mt-1">{expensesTotal.toFixed(2)}</span>
+        <div className="bg-card border border-border rounded-2xl shadow-sm p-5 flex flex-col items-center">
+          <span className="text-sm text-text font-medium">Expenses</span>
+          <span className="text-2xl font-bold text-heading mt-1">{expensesTotal.toFixed(2)}</span>
         </div>
-        <div className="bg-white border border-zinc-200 rounded-2xl shadow-sm p-5 flex flex-col items-center">
-          <span className="text-sm text-zinc-500 font-medium">Profit</span>
-          <span className={`text-2xl font-bold mt-1 ${profit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{profit.toFixed(2)}</span>
+        <div className="bg-card border border-border rounded-2xl shadow-sm p-5 flex flex-col items-center">
+          <span className="text-sm text-text font-medium">Profit</span>
+          <span className={`text-2xl font-bold mt-1 ${profit >= 0 ? 'text-success' : 'text-error'}`}>{profit.toFixed(2)}</span>
         </div>
       </div>
 
       {/* Chart card */}
-      <div className="bg-white border border-zinc-200 rounded-2xl shadow-sm p-6">
-        <h2 className="text-lg font-semibold text-zinc-800 mb-4">Sales Last 7 Days</h2>
+      <div className="bg-card border border-border rounded-2xl shadow-sm p-6">
+        <h2 className="text-lg font-semibold text-heading mb-4">Sales Last 7 Days</h2>
         <ResponsiveContainer width="100%" height={320}>
           <BarChart data={salesData}>
             <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" />

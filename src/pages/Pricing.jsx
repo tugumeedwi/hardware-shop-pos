@@ -181,12 +181,12 @@ export default function Pricing() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 p-4 font-sans">
+    <div className="min-h-screen bg-background p-4 font-sans">
       <div className="max-w-5xl mx-auto pt-8">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-zinc-800">Choose your plan</h1>
-          <p className="text-zinc-500 mt-2">Your shop is currently{' '}
-            <span className={`font-medium ${isActive ? 'text-emerald-600' : 'text-amber-600'}`}>
+          <h1 className="text-3xl font-bold text-heading">Choose your plan</h1>
+          <p className="text-text mt-2">Your shop is currently{' '}
+            <span className={`font-medium ${isActive ? 'text-primary' : 'text-amber-600'}`}>
               {current?.subscription_status || 'unknown'}
             </span>
             {isActive && current?.plan_id && <> · {current.plan_id}</>}
@@ -195,20 +195,20 @@ export default function Pricing() {
 
         {/* Billing cycle toggle */}
         <div className="flex justify-center mb-8">
-          <div className="inline-flex bg-white border border-zinc-200 rounded-xl p-1 shadow-sm">
+          <div className="inline-flex bg-card border border-border rounded-xl p-1 shadow-sm">
             {CYCLES.map(cycle => (
               <button
                 key={cycle.id}
                 onClick={() => setBillingCycle(cycle.id)}
                 className={`relative px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
                   billingCycle === cycle.id
-                    ? 'bg-zinc-800 text-white'
-                    : 'text-zinc-600 hover:text-zinc-900'
+                    ? 'bg-ink-hover text-white'
+                    : 'text-text hover:text-heading'
                 }`}
               >
                 {cycle.label}
                 {cycle.badge && billingCycle === cycle.id && (
-                  <span className="absolute -top-2 -right-2 bg-emerald-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                  <span className="absolute -top-2 -right-2 bg-primary text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
                     {cycle.badge}
                   </span>
                 )}
@@ -224,24 +224,24 @@ export default function Pricing() {
             return (
               <div
                 key={plan.id}
-                className={`rounded-2xl border p-6 shadow-sm bg-white transition-all ${
-                  plan.highlight ? 'border-emerald-400 ring-2 ring-emerald-100' : 'border-zinc-200'
+                className={`rounded-2xl border p-6 shadow-sm bg-card transition-all ${
+                  plan.highlight ? 'border-primary ring-2 ring-primary-light' : 'border-border'
                 }`}
               >
-                <h2 className="text-xl font-bold text-zinc-800">{plan.name}</h2>
-                <p className="text-sm text-zinc-500 mt-1">{plan.description}</p>
+                <h2 className="text-xl font-bold text-heading">{plan.name}</h2>
+                <p className="text-sm text-text mt-1">{plan.description}</p>
                 <div className="mt-4 flex items-baseline gap-1">
-                  <span className="text-3xl font-bold text-zinc-800">
+                  <span className="text-3xl font-bold text-heading">
                     {amount == null ? '—' : `${fmtUGX(amount)}`}
                   </span>
-                  <span className="text-sm text-zinc-500">
+                  <span className="text-sm text-text">
                     {amount == null ? 'Price not set' : `${plan.currency}${cycle.suffix ? ' ' + cycle.suffix : ''}`}
                   </span>
                 </div>
                 <ul className="mt-5 space-y-2">
                   {plan.features.map(f => (
-                    <li key={f} className="flex items-start gap-2 text-sm text-zinc-600">
-                      <svg className="h-4 w-4 text-emerald-500 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <li key={f} className="flex items-start gap-2 text-sm text-text">
+                      <svg className="h-4 w-4 text-primary mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
                       </svg>
                       {f}
@@ -250,7 +250,7 @@ export default function Pricing() {
                 </ul>
                 <div className="mt-6 space-y-2">
                   {isCurrentPlan(plan) ? (
-                    <div className="text-center text-sm font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-xl py-3">
+                    <div className="text-center text-sm font-semibold text-primary bg-primary-soft border border-primary-light rounded-xl py-3">
                       Current plan
                     </div>
                   ) : (
@@ -260,8 +260,8 @@ export default function Pricing() {
                         disabled={isActive}
                         className={`w-full py-3 rounded-xl font-semibold transition-colors ${
                           plan.highlight
-                            ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                            : 'bg-zinc-800 hover:bg-zinc-900 text-white'
+                            ? 'bg-primary hover:bg-primary-hover text-white'
+                            : 'bg-ink-hover hover:bg-sidebar text-white'
                         } ${isActive ? 'opacity-40 cursor-not-allowed' : ''}`}
                       >
                         Subscribe — {fmtUGX(amount)}
@@ -270,7 +270,7 @@ export default function Pricing() {
                         <button
                           onClick={() => handleStripe(plan)}
                           disabled={isActive || stripeLoading}
-                          className="w-full py-2.5 rounded-xl font-medium text-zinc-600 border border-zinc-300 hover:bg-zinc-50 transition-colors text-sm"
+                          className="w-full py-2.5 rounded-xl font-medium text-text border border-border-dark hover:bg-background transition-colors text-sm"
                         >
                           {stripeLoading ? 'Redirecting to card…' : 'Pay with card'}
                         </button>
@@ -284,22 +284,22 @@ export default function Pricing() {
         </div>
 
         {confirmed && (
-          <div className="mt-8 bg-emerald-50 border border-emerald-200 rounded-2xl p-6 text-center">
-            <div className="mx-auto h-12 w-12 rounded-full bg-emerald-100 flex items-center justify-center mb-3">
-              <svg className="h-6 w-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="mt-8 bg-primary-soft border border-primary-light rounded-2xl p-6 text-center">
+            <div className="mx-auto h-12 w-12 rounded-full bg-primary-light flex items-center justify-center mb-3">
+              <svg className="h-6 w-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
               </svg>
             </div>
-            <h3 className="text-lg font-bold text-zinc-800">Payment pending review</h3>
-            <p className="text-sm text-zinc-600 mt-1">
+            <h3 className="text-lg font-bold text-heading">Payment pending review</h3>
+            <p className="text-sm text-text mt-1">
               {confirmed.planName} · {fmtUGX(confirmed.amount)} UGX · {confirmed.billing_cycle}
             </p>
-            <p className="text-sm text-zinc-600 mt-2">
+            <p className="text-sm text-text mt-2">
               We&apos;ll activate your account within 24 hours once the payment is confirmed.
             </p>
             <button
               onClick={() => setConfirmed(null)}
-              className="mt-4 text-sm font-semibold text-emerald-700 hover:underline"
+              className="mt-4 text-sm font-semibold text-primary-hover hover:underline"
             >
               Back to plans
             </button>
@@ -308,7 +308,7 @@ export default function Pricing() {
 
         {BAD_STATUSES.includes(current?.subscription_status) && !confirmed && (
           <div className="mt-8 text-center">
-            <Link to="/dashboard" className="text-sm text-emerald-600 hover:underline">
+            <Link to="/dashboard" className="text-sm text-primary hover:underline">
               Skip for now → continue to your dashboard
             </Link>
           </div>
@@ -316,18 +316,18 @@ export default function Pricing() {
 
         {/* Manual payment modal */}
         {modal && (
-          <div className="fixed inset-0 z-50 bg-zinc-900/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-            <div className="bg-white border border-zinc-200 rounded-2xl shadow-2xl p-6 w-full max-w-lg my-8">
+          <div className="fixed inset-0 z-50 bg-sidebar/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+            <div className="bg-card border border-border rounded-2xl shadow-2xl p-6 w-full max-w-lg my-8">
               <div className="flex items-start justify-between mb-4">
                 <div>
-                  <h2 className="text-lg font-bold text-zinc-800">
+                  <h2 className="text-lg font-bold text-heading">
                     {modal.plan.name} · {CYCLES.find(c => c.id === modal.cycle)?.label}
                   </h2>
-                  <p className="text-sm text-zinc-500 mt-0.5">
+                  <p className="text-sm text-text mt-0.5">
                     {fmtUGX(modal.amount)} UGX
                   </p>
                 </div>
-                <button onClick={closeModal} className="text-zinc-400 hover:text-zinc-600" aria-label="Close">
+                <button onClick={closeModal} className="text-text-muted hover:text-text" aria-label="Close">
                   <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
                   </svg>
@@ -339,19 +339,19 @@ export default function Pricing() {
                   <label
                     key={m.id}
                     className={`flex items-start gap-3 border rounded-xl p-3 cursor-pointer transition-colors ${
-                      method === m.id ? 'border-emerald-400 ring-2 ring-emerald-100 bg-emerald-50/50' : 'border-zinc-200 hover:border-zinc-300'
+                      method === m.id ? 'border-primary ring-2 ring-primary-light bg-primary-soft/50' : 'border-border hover:border-border-dark'
                     }`}
                   >
                     <input
                       type="radio"
                       name="payment-method"
-                      className="mt-1 accent-emerald-600"
+                      className="mt-1 accent-primary"
                       checked={method === m.id}
                       onChange={() => setMethod(m.id)}
                     />
                     <span className="flex-1">
-                      <span className="block font-semibold text-zinc-800 text-sm">{m.label}</span>
-                      <span className="block text-xs text-zinc-500 mt-1 whitespace-pre-line">
+                      <span className="block font-semibold text-heading text-sm">{m.label}</span>
+                      <span className="block text-xs text-text mt-1 whitespace-pre-line">
                         {instructionsLines(PAYMENT_INFO[m.id]).map((line, i) => (
                           <span key={i} className="block">{line}</span>
                         ))}
@@ -362,7 +362,7 @@ export default function Pricing() {
               </div>
 
               <div className="mt-4">
-                <label className="block text-sm font-semibold text-zinc-700 mb-1">
+                <label className="block text-sm font-semibold text-text-strong mb-1">
                   Reference / transaction number
                 </label>
                 <input
@@ -370,29 +370,29 @@ export default function Pricing() {
                   value={reference}
                   onChange={(e) => setReference(e.target.value)}
                   placeholder="e.g. bank slip ref or MoMo tx id"
-                  className="w-full border border-zinc-300 rounded-xl px-4 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  className="w-full border border-border-dark rounded-xl px-4 py-2.5 bg-card focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
 
               <div className="mt-3">
-                <label className="block text-sm font-semibold text-zinc-700 mb-1">Note (optional)</label>
+                <label className="block text-sm font-semibold text-text-strong mb-1">Note (optional)</label>
                 <textarea
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
                   rows={2}
                   placeholder="Anything we should know about this payment"
-                  className="w-full border border-zinc-300 rounded-xl px-4 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  className="w-full border border-border-dark rounded-xl px-4 py-2.5 bg-card focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
 
               <button
                 onClick={submitManual}
                 disabled={submitting}
-                className="w-full mt-5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-semibold py-3 rounded-xl transition-colors shadow-sm"
+                className="w-full mt-5 bg-primary hover:bg-primary-hover disabled:opacity-60 text-white font-semibold py-3 rounded-xl transition-colors shadow-sm"
               >
                 {submitting ? 'Submitting…' : `Confirm payment of ${fmtUGX(modal.amount)} UGX`}
               </button>
-              <p className="text-xs text-zinc-400 text-center mt-3">
+              <p className="text-xs text-text-muted text-center mt-3">
                 You&apos;ll get a confirmation on this page once your account is activated.
               </p>
             </div>

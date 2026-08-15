@@ -157,34 +157,34 @@ export default function TaxSettings() {
     reader.readAsDataURL(certFile)
   }
 
-  const inputClass = 'w-full border border-zinc-300 rounded-xl px-4 py-3 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400 text-zinc-800'
+  const inputClass = 'w-full border border-border-dark rounded-xl px-4 py-3 bg-card focus:outline-none focus:ring-2 focus:ring-primary text-heading'
 
   return (
-    <div className="min-h-screen bg-zinc-50 p-4 font-sans flex items-start justify-center pt-12">
+    <div className="min-h-screen bg-background p-4 font-sans flex items-start justify-center pt-12">
       <div className="w-full max-w-2xl space-y-6">
-        <div className="bg-white border border-zinc-200 rounded-2xl shadow-sm p-6">
+        <div className="bg-card border border-border rounded-2xl shadow-sm p-6">
           <div className="flex items-center justify-between mb-2">
-            <h1 className="text-2xl font-bold text-zinc-800">E‑invoicing</h1>
-            {loadingTax && <span className="text-sm text-zinc-400">Loading…</span>}
+            <h1 className="text-2xl font-bold text-heading">E‑invoicing</h1>
+            {loadingTax && <span className="text-sm text-text-muted">Loading…</span>}
           </div>
-          <p className="text-sm text-zinc-500 mb-6">
+          <p className="text-sm text-text mb-6">
             URA / FDN tax invoice settings for this shop. When enabled, every completed sale is
             queued for a tax invoice sent to the provider.
           </p>
 
           <div className="space-y-5">
-            <label className="flex items-center gap-3 p-3 bg-zinc-50 rounded-xl cursor-pointer hover:bg-zinc-100 transition-colors">
+            <label className="flex items-center gap-3 p-3 bg-background rounded-xl cursor-pointer hover:bg-surface transition-colors">
               <input
                 type="checkbox"
                 checked={taxEnabled}
                 onChange={(e) => setTaxEnabled(e.target.checked)}
-                className="rounded border-zinc-300 text-emerald-600 focus:ring-emerald-400 h-5 w-5"
+                className="rounded border-border-dark text-primary focus:ring-primary h-5 w-5"
               />
-              <span className="text-zinc-700 font-medium">Enable e‑invoicing for this shop</span>
+              <span className="text-text-strong font-medium">Enable e‑invoicing for this shop</span>
             </label>
 
             <div>
-              <label className="block text-sm font-medium text-zinc-700 mb-1">Tax Identification Number (TIN)</label>
+              <label className="block text-sm font-medium text-text-strong mb-1">Tax Identification Number (TIN)</label>
               <input
                 type="text"
                 placeholder="e.g. 1234567890123"
@@ -195,7 +195,7 @@ export default function TaxSettings() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-zinc-700 mb-1">Device Serial</label>
+              <label className="block text-sm font-medium text-text-strong mb-1">Device Serial</label>
               <input
                 type="text"
                 placeholder="EDR device serial"
@@ -206,7 +206,7 @@ export default function TaxSettings() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-zinc-700 mb-1">Provider</label>
+              <label className="block text-sm font-medium text-text-strong mb-1">Provider</label>
               <select
                 value={taxProvider}
                 onChange={(e) => setTaxProvider(e.target.value)}
@@ -218,7 +218,7 @@ export default function TaxSettings() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-zinc-700 mb-1">Provider endpoint (sandbox)</label>
+              <label className="block text-sm font-medium text-text-strong mb-1">Provider endpoint (sandbox)</label>
               <input
                 type="url"
                 placeholder="https://ura.example.com/api/invoice"
@@ -229,7 +229,7 @@ export default function TaxSettings() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-zinc-700 mb-1">Auth token (optional)</label>
+              <label className="block text-sm font-medium text-text-strong mb-1">Auth token (optional)</label>
               <input
                 type="password"
                 placeholder={hasToken ? 'Stored securely – enter a new value to replace it' : 'Bearer token for the provider'}
@@ -238,7 +238,7 @@ export default function TaxSettings() {
                 className={inputClass}
               />
               {hasToken && (
-                <p className="text-xs text-zinc-500 mt-1">
+                <p className="text-xs text-text mt-1">
                   A token is set and stored encrypted in Vault. Leave the field empty to keep it.
                 </p>
               )}
@@ -248,14 +248,14 @@ export default function TaxSettings() {
               <button
                 onClick={saveTaxSettings}
                 disabled={savingTax || loadingTax}
-                className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold px-5 py-2.5 rounded-xl transition-colors"
+                className="bg-primary hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold px-5 py-2.5 rounded-xl transition-colors"
               >
                 {savingTax ? 'Saving…' : 'Save tax settings'}
               </button>
               <button
                 onClick={testTaxConnection}
                 disabled={testingTax || loadingTax}
-                className="bg-white border border-zinc-300 hover:border-emerald-400 disabled:opacity-50 text-zinc-700 font-semibold px-5 py-2.5 rounded-xl transition-colors"
+                className="bg-card border border-border-dark hover:border-primary disabled:opacity-50 text-text-strong font-semibold px-5 py-2.5 rounded-xl transition-colors"
               >
                 {testingTax ? 'Testing…' : 'Test connection'}
               </button>
@@ -263,11 +263,11 @@ export default function TaxSettings() {
           </div>
         </div>
 
-        <div className="bg-white border border-zinc-200 rounded-2xl shadow-sm p-6">
-          <h2 className="text-lg font-semibold text-zinc-800 mb-4">Upload PKI Certificate (.pfx / .p12)</h2>
+        <div className="bg-card border border-border rounded-2xl shadow-sm p-6">
+          <h2 className="text-lg font-semibold text-heading mb-4">Upload PKI Certificate (.pfx / .p12)</h2>
           <form onSubmit={handleUploadCert} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-zinc-700 mb-1">Certificate File</label>
+              <label className="block text-sm font-medium text-text-strong mb-1">Certificate File</label>
               <input
                 type="file"
                 accept=".pfx,.p12"
@@ -276,7 +276,7 @@ export default function TaxSettings() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-zinc-700 mb-1">Certificate Password</label>
+              <label className="block text-sm font-medium text-text-strong mb-1">Certificate Password</label>
               <input
                 type="password"
                 value={certPassword}
@@ -287,21 +287,21 @@ export default function TaxSettings() {
             <button
               type="submit"
               disabled={uploading}
-              className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold px-5 py-2.5 rounded-xl transition-colors"
+              className="bg-primary hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold px-5 py-2.5 rounded-xl transition-colors"
             >
               {uploading ? 'Uploading…' : 'Upload Certificate'}
             </button>
           </form>
         </div>
 
-        <div className="bg-white border border-zinc-200 rounded-2xl shadow-sm p-6">
+        <div className="bg-card border border-border rounded-2xl shadow-sm p-6">
           <div className="flex items-center justify-between mb-1">
-            <h2 className="text-lg font-semibold text-zinc-800">Sync Health</h2>
-            <button onClick={fetchPendingCount} className="text-sm text-emerald-600 hover:underline">
+            <h2 className="text-lg font-semibold text-heading">Sync Health</h2>
+            <button onClick={fetchPendingCount} className="text-sm text-primary hover:underline">
               Refresh
             </button>
           </div>
-          <p className="text-zinc-600">Pending invoices (awaiting URA): {pendingCount}</p>
+          <p className="text-text">Pending invoices (awaiting URA): {pendingCount}</p>
         </div>
       </div>
     </div>

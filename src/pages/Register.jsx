@@ -49,22 +49,22 @@ export default function Register() {
 
   if (registered) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-zinc-50 font-sans p-4">
-        <div className="bg-white border border-zinc-200 rounded-2xl shadow-xl p-8 w-full max-w-md text-center space-y-4">
-          <div className="mx-auto h-14 w-14 rounded-full bg-emerald-100 flex items-center justify-center">
-            <svg className="h-7 w-7 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div className="min-h-screen flex items-center justify-center bg-background font-sans p-4">
+        <div className="bg-card border border-border rounded-2xl shadow-xl p-8 w-full max-w-md text-center space-y-4">
+          <div className="mx-auto h-14 w-14 rounded-full bg-primary-light flex items-center justify-center">
+            <svg className="h-7 w-7 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          <h1 className="text-2xl font-bold text-zinc-800">Shop created!</h1>
-          <p className="text-zinc-500 text-sm leading-relaxed">
-            Your shop <span className="font-medium text-zinc-700">{shopName}</span> is ready.
-            We sent a confirmation email to <span className="font-medium text-zinc-700">{email}</span>.
+          <h1 className="text-2xl font-bold text-heading">Shop created!</h1>
+          <p className="text-text text-sm leading-relaxed">
+            Your shop <span className="font-medium text-text-strong">{shopName}</span> is ready.
+            We sent a confirmation email to <span className="font-medium text-text-strong">{email}</span>.
             Click the link in the email to activate your account, then sign in.
           </p>
           <Link
             to="/login"
-            className="block w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 rounded-xl transition-colors shadow-sm"
+            className="block w-full bg-primary hover:bg-primary-hover text-white font-semibold py-3 rounded-xl transition-colors shadow-sm"
           >
             Go to sign in
           </Link>
@@ -74,11 +74,11 @@ export default function Register() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-zinc-50 font-sans p-4">
-      <form onSubmit={handleRegister} className="bg-white border border-zinc-200 rounded-2xl shadow-xl p-8 w-full max-w-md space-y-5">
+    <div className="min-h-screen flex items-center justify-center bg-background font-sans p-4">
+      <form onSubmit={handleRegister} className="bg-card border border-border rounded-2xl shadow-xl p-8 w-full max-w-md space-y-5">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-zinc-800">Create your shop</h1>
-          <p className="text-zinc-500 mt-1">Start selling in under a minute</p>
+          <h1 className="text-2xl font-bold text-heading">Create your shop</h1>
+          <p className="text-text mt-1">Start selling in under a minute</p>
         </div>
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3">
@@ -86,45 +86,45 @@ export default function Register() {
           </div>
         )}
         <div>
-          <label className="block text-sm font-medium text-zinc-700 mb-1">Email</label>
+          <label className="block text-sm font-medium text-text-strong mb-1">Email</label>
           <input
             type="email"
             placeholder="you@example.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full border border-zinc-300 rounded-xl px-4 py-3 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400 text-zinc-800"
+            className="w-full border border-border-dark rounded-xl px-4 py-3 bg-card focus:outline-none focus:ring-2 focus:ring-primary text-heading"
             required
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-zinc-700 mb-1">Password</label>
+          <label className="block text-sm font-medium text-text-strong mb-1">Password</label>
           <input
             type="password"
             placeholder="At least 6 characters"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full border border-zinc-300 rounded-xl px-4 py-3 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400 text-zinc-800"
+            className="w-full border border-border-dark rounded-xl px-4 py-3 bg-card focus:outline-none focus:ring-2 focus:ring-primary text-heading"
             required
             minLength={6}
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-zinc-700 mb-1">Shop name</label>
+          <label className="block text-sm font-medium text-text-strong mb-1">Shop name</label>
           <input
             type="text"
             placeholder="e.g. Acme Hardware"
             value={shopName}
             onChange={(e) => setShopName(e.target.value)}
-            className="w-full border border-zinc-300 rounded-xl px-4 py-3 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400 text-zinc-800"
+            className="w-full border border-border-dark rounded-xl px-4 py-3 bg-card focus:outline-none focus:ring-2 focus:ring-primary text-heading"
             required
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-zinc-700 mb-1">Business type</label>
+          <label className="block text-sm font-medium text-text-strong mb-1">Business type</label>
           <select
             value={businessType}
             onChange={(e) => setBusinessType(e.target.value)}
-            className="w-full border border-zinc-300 rounded-xl px-4 py-3 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400 text-zinc-800"
+            className="w-full border border-border-dark rounded-xl px-4 py-3 bg-card focus:outline-none focus:ring-2 focus:ring-primary text-heading"
           >
             {BUSINESS_TYPES.map((b) => (
               <option key={b.value} value={b.value}>{b.label}</option>
@@ -132,7 +132,7 @@ export default function Register() {
           </select>
         </div>
         <div>
-          <label className="block text-sm font-medium text-zinc-700 mb-1">Plan</label>
+          <label className="block text-sm font-medium text-text-strong mb-1">Plan</label>
           <div className="grid grid-cols-2 gap-2">
             {PLANS.map((p) => (
               <button
@@ -141,12 +141,12 @@ export default function Register() {
                 onClick={() => setPlanId(p.value)}
                 className={`rounded-xl border px-4 py-3 text-left transition-colors ${
                   planId === p.value
-                    ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-200'
-                    : 'border-zinc-300 bg-white hover:border-zinc-400'
+                    ? 'border-primary bg-primary-soft ring-2 ring-primary-light'
+                    : 'border-border-dark bg-card hover:border-border-dark'
                 }`}
               >
-                <div className="font-semibold text-zinc-800">{p.label}</div>
-                <div className="text-xs text-zinc-500">{p.hint}</div>
+                <div className="font-semibold text-heading">{p.label}</div>
+                <div className="text-xs text-text">{p.hint}</div>
               </button>
             ))}
           </div>
@@ -154,13 +154,13 @@ export default function Register() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-xl transition-colors shadow-sm"
+          className="w-full bg-primary hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-xl transition-colors shadow-sm"
         >
           {loading ? 'Creating shop...' : 'Create Shop'}
         </button>
-        <p className="text-center text-sm text-zinc-500">
+        <p className="text-center text-sm text-text">
           Already have an account?{' '}
-          <Link to="/login" className="text-emerald-600 hover:underline font-medium">Sign in</Link>
+          <Link to="/login" className="text-primary hover:underline font-medium">Sign in</Link>
         </p>
       </form>
     </div>

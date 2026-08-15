@@ -40,11 +40,11 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-zinc-50 font-sans p-4">
-      <form onSubmit={handleLogin} className="bg-white border border-zinc-200 rounded-2xl shadow-xl p-8 w-full max-w-md space-y-5">
+    <div className="min-h-screen flex items-center justify-center bg-background font-sans p-4">
+      <form onSubmit={handleLogin} className="bg-card border border-border rounded-2xl shadow-xl p-8 w-full max-w-md space-y-5">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-zinc-800">Hardware Shop</h1>
-          <p className="text-zinc-500 mt-1">Sign in to your account</p>
+          <h1 className="text-2xl font-bold text-heading">Hardware Shop</h1>
+          <p className="text-text mt-1">Sign in to your account</p>
         </div>
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3">
@@ -52,24 +52,24 @@ export default function Login() {
           </div>
         )}
         <div>
-          <label className="block text-sm font-medium text-zinc-700 mb-1">Email</label>
+          <label className="block text-sm font-medium text-text-strong mb-1">Email</label>
           <input
             type="email"
             placeholder="you@example.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full border border-zinc-300 rounded-xl px-4 py-3 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400 text-zinc-800"
+            className="w-full border border-border-dark rounded-xl px-4 py-3 bg-card focus:outline-none focus:ring-2 focus:ring-primary text-heading"
             required
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-zinc-700 mb-1">Password</label>
+          <label className="block text-sm font-medium text-text-strong mb-1">Password</label>
           <input
             type="password"
             placeholder="••••••••"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full border border-zinc-300 rounded-xl px-4 py-3 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400 text-zinc-800"
+            className="w-full border border-border-dark rounded-xl px-4 py-3 bg-card focus:outline-none focus:ring-2 focus:ring-primary text-heading"
             required
           />
         </div>
@@ -78,39 +78,39 @@ export default function Login() {
           <button
             type="button"
             onClick={() => setShowForgot(true)}
-            className="text-sm text-emerald-600 hover:underline font-medium -mt-1 self-start"
+            className="text-sm text-primary hover:underline font-medium -mt-1 self-start"
           >
             Forgot password?
           </button>
         ) : (
-          <div className="bg-zinc-50 border border-zinc-200 rounded-xl p-4 space-y-3">
+          <div className="bg-background border border-border rounded-xl p-4 space-y-3">
             {forgotSent ? (
-              <p className="text-sm text-zinc-600">
+              <p className="text-sm text-text">
                 If an account exists for <span className="font-medium">{forgotEmail}</span>, a
                 password reset link has been sent. Check your inbox (and spam).
               </p>
             ) : (
               <>
-                <p className="text-sm text-zinc-600">Enter your account email and we&apos;ll send a reset link.</p>
+                <p className="text-sm text-text">Enter your account email and we&apos;ll send a reset link.</p>
                 <input
                   type="email"
                   placeholder="you@example.com"
                   value={forgotEmail}
                   onChange={(e) => setForgotEmail(e.target.value)}
-                  className="w-full border border-zinc-300 rounded-xl px-4 py-3 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400 text-zinc-800"
+                  className="w-full border border-border-dark rounded-xl px-4 py-3 bg-card focus:outline-none focus:ring-2 focus:ring-primary text-heading"
                   required
                 />
                 <div className="flex gap-2">
                   <button
                     onClick={handleForgot}
-                    className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 rounded-xl transition-colors shadow-sm"
+                    className="flex-1 bg-primary hover:bg-primary-hover text-white font-semibold py-2.5 rounded-xl transition-colors shadow-sm"
                   >
                     Send reset link
                   </button>
                   <button
                     type="button"
                     onClick={() => setShowForgot(false)}
-                    className="px-3 py-2.5 text-sm text-zinc-500 hover:text-zinc-700 font-medium"
+                    className="px-3 py-2.5 text-sm text-text hover:text-text-strong font-medium"
                   >
                     Cancel
                   </button>
@@ -123,13 +123,13 @@ export default function Login() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-xl transition-colors shadow-sm"
+          className="w-full bg-primary hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-xl transition-colors shadow-sm"
         >
           {loading ? 'Signing in...' : 'Sign In'}
         </button>
-        <p className="text-center text-sm text-zinc-500">
+        <p className="text-center text-sm text-text">
           New here?{' '}
-          <Link to="/register" className="text-emerald-600 hover:underline font-medium">Create a shop</Link>
+          <Link to="/register" className="text-primary hover:underline font-medium">Create a shop</Link>
         </p>
       </form>
     </div>

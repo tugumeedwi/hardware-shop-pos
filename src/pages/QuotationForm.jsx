@@ -139,25 +139,25 @@ export default function QuotationForm() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 p-4 font-sans">
-      <h2 className="text-2xl font-bold text-zinc-800 mb-6">New Quotation</h2>
+    <div className="min-h-screen bg-background p-4 font-sans">
+      <h2 className="text-2xl font-bold text-heading mb-6">New Quotation</h2>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Products */}
         <div className="lg:col-span-2 space-y-4">
           <div className="relative">
             <input type="text" placeholder="Search products..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 bg-white border border-zinc-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-zinc-800 placeholder-zinc-400" />
-            <svg className="absolute left-3 top-3.5 h-5 w-5 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              className="w-full pl-10 pr-4 py-3 bg-card border border-border rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-primary text-heading placeholder-text-muted" />
+            <svg className="absolute left-3 top-3.5 h-5 w-5 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4 max-h-[60vh] overflow-y-auto pr-1">
             {filteredProducts.map(product => (
               <button key={product.id} onClick={() => addToCart(product)}
-                className="group relative bg-white border border-zinc-200 rounded-xl p-4 text-left shadow-sm hover:shadow-md hover:scale-[1.02] active:scale-100 transition-all duration-200">
-                <div className="font-semibold text-zinc-800 text-sm">{product.name}</div>
-                <div className="text-xs text-zinc-500 mt-1">Stock: {product.stock_quantity}</div>
-                <div className="text-xs font-bold text-zinc-700 mt-1">
+                className="group relative bg-card border border-border rounded-xl p-4 text-left shadow-sm hover:shadow-md hover:scale-[1.02] active:scale-100 transition-all duration-200">
+                <div className="font-semibold text-heading text-sm">{product.name}</div>
+                <div className="text-xs text-text mt-1">Stock: {product.stock_quantity}</div>
+                <div className="text-xs font-bold text-text-strong mt-1">
                   {product.active_pricing_methods?.[0] === 'piece' && `Pc: ${product.price_per_piece}`}
                   {product.active_pricing_methods?.[0] === 'box' && `Box: ${product.price_per_box}`}
                   {product.active_pricing_methods?.[0] === 'sqm' && `Sqm: ${product.price_per_sqm}`}
@@ -170,59 +170,59 @@ export default function QuotationForm() {
 
         {/* Cart & details */}
         <div className="lg:col-span-1">
-          <div className="sticky top-6 bg-white/80 backdrop-blur-sm border border-zinc-200 rounded-2xl shadow-xl p-5 space-y-4">
-            <h3 className="text-xl font-bold text-zinc-800">Items</h3>
+          <div className="sticky top-6 bg-card/80 backdrop-blur-sm border border-border rounded-2xl shadow-xl p-5 space-y-4">
+            <h3 className="text-xl font-bold text-heading">Items</h3>
             <div className="max-h-64 overflow-y-auto space-y-3">
               {cart.map((item, index) => (
-                <div key={index} className="flex items-center justify-between bg-zinc-50 rounded-xl p-3 text-sm">
+                <div key={index} className="flex items-center justify-between bg-background rounded-xl p-3 text-sm">
                   <div className="flex-1">
-                    <p className="font-medium text-zinc-700 truncate">{item.product.name}</p>
+                    <p className="font-medium text-text-strong truncate">{item.product.name}</p>
                     <div className="flex items-center gap-2 mt-1">
                       <select value={item.sellingUnit} onChange={(e) => updateCartItem(index, 'sellingUnit', e.target.value)}
-                        className="text-xs border border-zinc-300 rounded-lg px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-emerald-400">
+                        className="text-xs border border-border-dark rounded-lg px-2 py-1 bg-card focus:outline-none focus:ring-1 focus:ring-primary">
                         {item.product.active_pricing_methods.map(unit => <option key={unit} value={unit}>{unit}</option>)}
                       </select>
                       <input type="number" min="1" value={item.quantity}
                         onChange={(e) => { let val = parseFloat(e.target.value); if (isNaN(val) || val < 1) val = 1; updateCartItem(index, 'quantity', val) }}
-                        className="w-14 text-xs border border-zinc-300 rounded-lg px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-emerald-400" />
+                        className="w-14 text-xs border border-border-dark rounded-lg px-2 py-1 bg-card focus:outline-none focus:ring-1 focus:ring-primary" />
                     </div>
                   </div>
-                  <span className="font-semibold text-zinc-700 ml-2">{(item.quantity * item.unitPrice).toFixed(2)}</span>
+                  <span className="font-semibold text-text-strong ml-2">{(item.quantity * item.unitPrice).toFixed(2)}</span>
                   <button onClick={() => removeFromCart(index)} className="ml-2 text-red-400 hover:text-red-600">✕</button>
                 </div>
               ))}
             </div>
             <div className="space-y-2 text-sm">
-              <div className="flex justify-between text-zinc-600"><span>Subtotal</span><span>{totalBeforeDiscount.toFixed(2)}</span></div>
+              <div className="flex justify-between text-text"><span>Subtotal</span><span>{totalBeforeDiscount.toFixed(2)}</span></div>
               <div className="flex items-center gap-2">
-                <label className="text-zinc-600">Discount</label>
+                <label className="text-text">Discount</label>
                 <input type="number" value={discount} onChange={(e) => setDiscount(e.target.value)}
-                  className="w-20 border border-zinc-300 rounded-lg px-2 py-1 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-emerald-400" />
+                  className="w-20 border border-border-dark rounded-lg px-2 py-1 text-sm bg-card focus:outline-none focus:ring-1 focus:ring-primary" />
               </div>
-              <div className="flex justify-between text-zinc-800 font-bold text-lg border-t border-zinc-200 pt-2"><span>Net</span><span>{totalAfterDiscount.toFixed(2)}</span></div>
+              <div className="flex justify-between text-heading font-bold text-lg border-t border-border pt-2"><span>Net</span><span>{totalAfterDiscount.toFixed(2)}</span></div>
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium text-zinc-600">Customer Phone</label>
+              <label className="text-sm font-medium text-text">Customer Phone</label>
               <div className="flex gap-2">
                 <input type="text" placeholder="07XX..." value={customerPhoneInput} onChange={(e) => setCustomerPhoneInput(e.target.value)}
-                  className="flex-1 border border-zinc-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-emerald-400" />
-                <button onClick={lookupCustomer} className="bg-zinc-700 text-white px-3 py-2 rounded-lg text-sm hover:bg-zinc-800">Lookup</button>
+                  className="flex-1 border border-border-dark rounded-lg px-3 py-2 bg-card focus:outline-none focus:ring-1 focus:ring-primary" />
+                <button onClick={lookupCustomer} className="bg-ink text-white px-3 py-2 rounded-lg text-sm hover:bg-ink-hover">Lookup</button>
               </div>
               {customerLookupError && <p className="text-xs text-red-500">{customerLookupError}</p>}
-              {selectedCustomer && <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-2 text-sm font-medium text-emerald-800">{selectedCustomer.name}</div>}
+              {selectedCustomer && <div className="bg-primary-soft border border-primary-light rounded-xl p-2 text-sm font-medium text-primary-hover">{selectedCustomer.name}</div>}
             </div>
             <div>
-              <label className="text-sm font-medium text-zinc-600">Expiry Date</label>
+              <label className="text-sm font-medium text-text">Expiry Date</label>
               <input type="date" value={expiryDate} onChange={(e) => setExpiryDate(e.target.value)}
-                className="w-full border border-zinc-300 rounded-lg px-3 py-2 mt-1 bg-white focus:outline-none focus:ring-1 focus:ring-emerald-400" />
+                className="w-full border border-border-dark rounded-lg px-3 py-2 mt-1 bg-card focus:outline-none focus:ring-1 focus:ring-primary" />
             </div>
             <div>
-              <label className="text-sm font-medium text-zinc-600">Notes</label>
+              <label className="text-sm font-medium text-text">Notes</label>
               <textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)}
-                className="w-full border border-zinc-300 rounded-lg px-3 py-2 mt-1 bg-white focus:outline-none focus:ring-1 focus:ring-emerald-400" placeholder="Any special terms..." />
+                className="w-full border border-border-dark rounded-lg px-3 py-2 mt-1 bg-card focus:outline-none focus:ring-1 focus:ring-primary" placeholder="Any special terms..." />
             </div>
             <button onClick={saveQuotation} disabled={saving}
-              className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold py-3 rounded-xl transition-colors">
+              className="w-full bg-primary hover:bg-primary-hover disabled:opacity-50 text-white font-bold py-3 rounded-xl transition-colors">
               {saving ? 'Saving...' : 'Save Quotation'}
             </button>
           </div>

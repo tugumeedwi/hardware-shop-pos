@@ -56,7 +56,7 @@ export default function Payments() {
 
   return (
     <div className="p-4 max-w-2xl mx-auto font-sans">
-      <h1 className="text-2xl font-bold text-zinc-800 mb-6">Installment Payments</h1>
+      <h1 className="text-2xl font-bold text-heading mb-6">Installment Payments</h1>
 
       <div className="flex gap-2 mb-6">
         <input
@@ -65,20 +65,20 @@ export default function Payments() {
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') searchCustomer() }}
-          className="flex-1 border border-zinc-300 rounded-xl px-4 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400"
+          className="flex-1 border border-border-dark rounded-xl px-4 py-2.5 bg-card focus:outline-none focus:ring-2 focus:ring-primary"
         />
-        <button onClick={searchCustomer} className="bg-zinc-700 hover:bg-zinc-800 text-white px-5 py-2.5 rounded-xl font-medium transition-colors">Search</button>
+        <button onClick={searchCustomer} className="bg-ink hover:bg-ink-hover text-white px-5 py-2.5 rounded-xl font-medium transition-colors">Search</button>
       </div>
 
       {customer && (
-        <div className="bg-white border border-zinc-200 rounded-2xl p-4 mb-6 shadow-sm">
-          <p className="font-semibold text-zinc-800">{customer.name}</p>
-          <p className="text-sm text-zinc-600">Current Balance: <span className="font-bold text-red-600">{customer.current_credit_balance.toFixed(2)}</span></p>
+        <div className="bg-card border border-border rounded-2xl p-4 mb-6 shadow-sm">
+          <p className="font-semibold text-heading">{customer.name}</p>
+          <p className="text-sm text-text">Current Balance: <span className="font-bold text-red-600">{customer.current_credit_balance.toFixed(2)}</span></p>
         </div>
       )}
 
       {creditSales.length === 0 && customer && (
-        <div className="bg-white border border-zinc-200 rounded-2xl p-8 text-center text-zinc-400 shadow-sm">
+        <div className="bg-card border border-border rounded-2xl p-8 text-center text-text-muted shadow-sm">
           <p className="text-sm">No outstanding credit sales for this customer.</p>
         </div>
       )}
@@ -87,10 +87,10 @@ export default function Payments() {
         const paid = sale.amount_paid || 0
         const remaining = sale.total_amount - paid
         return (
-          <div key={sale.id} className="bg-white border border-zinc-200 rounded-2xl p-4 mb-3 shadow-sm">
-            <p className="font-medium text-zinc-800">Sale #{sale.id.slice(0, 8)} – {new Date(sale.created_at).toLocaleDateString()}</p>
-            <p className="text-sm text-zinc-600">Total: {sale.total_amount.toFixed(2)} – Paid: {paid.toFixed(2)}</p>
-            <p className="text-sm font-semibold text-zinc-700">Remaining: <span className="text-red-600">{remaining.toFixed(2)}</span></p>
+          <div key={sale.id} className="bg-card border border-border rounded-2xl p-4 mb-3 shadow-sm">
+            <p className="font-medium text-heading">Sale #{sale.id.slice(0, 8)} – {new Date(sale.created_at).toLocaleDateString()}</p>
+            <p className="text-sm text-text">Total: {sale.total_amount.toFixed(2)} – Paid: {paid.toFixed(2)}</p>
+            <p className="text-sm font-semibold text-text-strong">Remaining: <span className="text-red-600">{remaining.toFixed(2)}</span></p>
             {activeSaleId === sale.id ? (
               <div className="flex gap-2 mt-3">
                 <input
@@ -98,17 +98,17 @@ export default function Payments() {
                   value={paymentAmount}
                   onChange={(e) => setPaymentAmount(e.target.value)}
                   placeholder="Amount"
-                  className="w-32 border border-zinc-300 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  className="w-32 border border-border-dark rounded-xl px-3 py-2 bg-card focus:outline-none focus:ring-2 focus:ring-primary"
                 />
-                <button onClick={() => recordPayment(sale)} disabled={processing} className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-medium transition-colors disabled:opacity-60">
+                <button onClick={() => recordPayment(sale)} disabled={processing} className="bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-xl font-medium transition-colors disabled:opacity-60">
                   {processing ? 'Saving…' : 'Confirm'}
                 </button>
-                <button onClick={() => setActiveSaleId(null)} className="text-zinc-500 hover:text-zinc-700 font-medium py-2">Cancel</button>
+                <button onClick={() => setActiveSaleId(null)} className="text-text hover:text-text-strong font-medium py-2">Cancel</button>
               </div>
             ) : (
               <button
                 onClick={() => { setActiveSaleId(sale.id); setPaymentAmount('') }}
-                className="mt-3 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-medium transition-colors text-sm"
+                className="mt-3 bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-xl font-medium transition-colors text-sm"
               >
                 Record Payment
               </button>

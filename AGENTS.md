@@ -52,4 +52,4 @@ Built as an offline-first PWA using React + Supabase.
 - All data access via Supabase client (never raw SQL from frontend).
 - Offline writes go through IndexedDB syncQueue.
 - Server-side logic in Edge Functions.
-- Keep UI consistent with Bento/glassmorphism design (Zinc + Emerald).
+- Keep UI consistent with the enterprise dashboard design: semantic palette in `src/index.css` `@theme` (bg-background, bg-card, text-heading, text-text, border-border, bg-primary, status tokens success/warning/error/info, bg-sidebar) and a fixed sidebar + top header layout in `src/components/Sidebar.jsx` / `Layout.jsx`. Never reintroduce raw `zinc-*` / `emerald-*` classes.

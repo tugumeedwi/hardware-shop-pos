@@ -31,13 +31,13 @@ export default function ResetPassword() {
 
   if (!session) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-zinc-50 font-sans p-4">
-        <div className="bg-white border border-zinc-200 rounded-2xl shadow-xl p-8 w-full max-w-md text-center space-y-4">
-          <h1 className="text-2xl font-bold text-zinc-800">Reset password</h1>
-          <p className="text-sm text-zinc-500">
+      <div className="min-h-screen flex items-center justify-center bg-background font-sans p-4">
+        <div className="bg-card border border-border rounded-2xl shadow-xl p-8 w-full max-w-md text-center space-y-4">
+          <h1 className="text-2xl font-bold text-heading">Reset password</h1>
+          <p className="text-sm text-text">
             Open the reset link from your email to continue. No active session found.
           </p>
-          <Link to="/login" className="inline-block text-sm text-emerald-600 hover:underline font-medium">
+          <Link to="/login" className="inline-block text-sm text-primary hover:underline font-medium">
             Back to sign in
           </Link>
         </div>
@@ -47,13 +47,13 @@ export default function ResetPassword() {
 
   if (!looksLikeRecovery) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-zinc-50 font-sans p-4">
-        <div className="bg-white border border-zinc-200 rounded-2xl shadow-xl p-8 w-full max-w-md text-center space-y-4">
-          <h1 className="text-2xl font-bold text-zinc-800">Already signed in</h1>
-          <p className="text-sm text-zinc-500">
+      <div className="min-h-screen flex items-center justify-center bg-background font-sans p-4">
+        <div className="bg-card border border-border rounded-2xl shadow-xl p-8 w-full max-w-md text-center space-y-4">
+          <h1 className="text-2xl font-bold text-heading">Already signed in</h1>
+          <p className="text-sm text-text">
             This page is only for resetting your password from a reset link.
           </p>
-          <Link to="/pos" className="inline-block text-sm text-emerald-600 hover:underline font-medium">
+          <Link to="/pos" className="inline-block text-sm text-primary hover:underline font-medium">
             Go to POS
           </Link>
         </div>
@@ -62,38 +62,38 @@ export default function ResetPassword() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-zinc-50 font-sans p-4">
-      <form onSubmit={handleSubmit} className="bg-white border border-zinc-200 rounded-2xl shadow-xl p-8 w-full max-w-md space-y-5">
+    <div className="min-h-screen flex items-center justify-center bg-background font-sans p-4">
+      <form onSubmit={handleSubmit} className="bg-card border border-border rounded-2xl shadow-xl p-8 w-full max-w-md space-y-5">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-zinc-800">Set a new password</h1>
-          <p className="text-zinc-500 mt-1">Choose a strong password for your account</p>
+          <h1 className="text-2xl font-bold text-heading">Set a new password</h1>
+          <p className="text-text mt-1">Choose a strong password for your account</p>
         </div>
         <div>
-          <label className="block text-sm font-medium text-zinc-700 mb-1">New password</label>
+          <label className="block text-sm font-medium text-text-strong mb-1">New password</label>
           <input
             type="password"
             placeholder="Min. 6 characters"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full border border-zinc-300 rounded-xl px-4 py-3 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400 text-zinc-800"
+            className="w-full border border-border-dark rounded-xl px-4 py-3 bg-card focus:outline-none focus:ring-2 focus:ring-primary text-heading"
             required
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-zinc-700 mb-1">Confirm password</label>
+          <label className="block text-sm font-medium text-text-strong mb-1">Confirm password</label>
           <input
             type="password"
             placeholder="Repeat your password"
             value={confirm}
             onChange={(e) => setConfirm(e.target.value)}
-            className="w-full border border-zinc-300 rounded-xl px-4 py-3 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400 text-zinc-800"
+            className="w-full border border-border-dark rounded-xl px-4 py-3 bg-card focus:outline-none focus:ring-2 focus:ring-primary text-heading"
             required
           />
         </div>
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-xl transition-colors shadow-sm"
+          className="w-full bg-primary hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-xl transition-colors shadow-sm"
         >
           {loading ? 'Updating...' : 'Update password'}
         </button>

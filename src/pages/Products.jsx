@@ -31,11 +31,11 @@ const baseForm = (isHardware) => ({
   customAttributes: []
 })
 
-const inputClass = 'border border-zinc-300 rounded-xl px-4 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400'
+const inputClass = 'border border-border-dark rounded-xl px-4 py-2.5 bg-card focus:outline-none focus:ring-2 focus:ring-primary'
 
 const Field = ({ label, required, children }) => (
   <label className="block">
-    <span className="block text-sm font-medium text-zinc-600 mb-1">
+    <span className="block text-sm font-medium text-text mb-1">
       {label} {required && <span className="text-red-500">*</span>}
     </span>
     {children}
@@ -253,20 +253,20 @@ export default function Products() {
     return businessType === 'general' ? 'General' : 'Hardware'
   }
 
-  if (loading) return <div className="p-8 text-center text-zinc-500">Loading products...</div>
+  if (loading) return <div className="p-8 text-center text-text">Loading products...</div>
 
   return (
-    <div className="min-h-screen bg-zinc-50 p-4 font-sans">
+    <div className="min-h-screen bg-background p-4 font-sans">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-zinc-800">Product Management</h1>
-        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-100">
+        <h1 className="text-2xl font-bold text-heading">Product Management</h1>
+        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-primary-soft text-primary-hover border border-primary-light">
           {businessType}
         </span>
       </div>
 
       {/* Form card */}
-      <form onSubmit={handleSave} className="bg-white border border-zinc-200 rounded-2xl shadow-sm p-6 mb-8 max-w-3xl">
-        <h2 className="text-lg font-semibold text-zinc-800 mb-4">{editing ? 'Edit Product' : 'Add New Product'}</h2>
+      <form onSubmit={handleSave} className="bg-card border border-border rounded-2xl shadow-sm p-6 mb-8 max-w-3xl">
+        <h2 className="text-lg font-semibold text-heading mb-4">{editing ? 'Edit Product' : 'Add New Product'}</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Field label="Product Name" required>
             <input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputClass + ' w-full'} required />
@@ -278,12 +278,12 @@ export default function Products() {
             <input type="text" placeholder={isPhone ? 'Internal code for this phone' : 'Scannable barcode / SKU'} value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} className={inputClass + ' w-full'} />
           </Field>
           {isHardware ? (
-            <label className="flex items-center gap-2 text-zinc-700 self-end pb-2.5">
-              <input type="checkbox" checked={form.is_tile} onChange={(e) => setForm({ ...form, is_tile: e.target.checked })} className="rounded border-zinc-300 text-emerald-600 focus:ring-emerald-400" />
+            <label className="flex items-center gap-2 text-text-strong self-end pb-2.5">
+              <input type="checkbox" checked={form.is_tile} onChange={(e) => setForm({ ...form, is_tile: e.target.checked })} className="rounded border-border-dark text-primary focus:ring-primary" />
               Tile product?
             </label>
           ) : (
-            <div className="flex items-center text-sm text-zinc-500 self-end pb-2.5">
+            <div className="flex items-center text-sm text-text self-end pb-2.5">
               {isPhone ? 'Phone product (sold by piece)' : 'General product (sold by piece)'}
             </div>
           )}
@@ -313,7 +313,7 @@ export default function Products() {
 
         {isGeneral && (
           <div className="mt-4">
-            <div className="font-medium text-zinc-700 mb-2">Custom attributes</div>
+            <div className="font-medium text-text-strong mb-2">Custom attributes</div>
             <div className="space-y-2">
               {form.customAttributes.map((attr, index) => (
                 <div key={index} className="flex gap-2">
@@ -353,7 +353,7 @@ export default function Products() {
               <button
                 type="button"
                 onClick={() => setForm({ ...form, customAttributes: [...form.customAttributes, { key: '', value: '' }] })}
-                className="text-sm text-emerald-600 hover:underline"
+                className="text-sm text-primary hover:underline"
               >+ Add attribute</button>
             </div>
           </div>
@@ -361,11 +361,11 @@ export default function Products() {
 
         {isHardware ? (
           <>
-            <div className="mt-4 font-medium text-zinc-700">Active Pricing Methods</div>
+            <div className="mt-4 font-medium text-text-strong">Active Pricing Methods</div>
             <div className="flex flex-wrap gap-4 mt-2">
               {['piece', 'box', 'sqm', 'kg'].map(unit => (
-                <label key={unit} className="flex items-center gap-1.5 text-sm text-zinc-600">
-                  <input type="checkbox" checked={form.active_methods[unit]} onChange={(e) => setForm({ ...form, active_methods: { ...form.active_methods, [unit]: e.target.checked } })} className="rounded border-zinc-300 text-emerald-600 focus:ring-emerald-400" />
+                <label key={unit} className="flex items-center gap-1.5 text-sm text-text">
+                  <input type="checkbox" checked={form.active_methods[unit]} onChange={(e) => setForm({ ...form, active_methods: { ...form.active_methods, [unit]: e.target.checked } })} className="rounded border-border-dark text-primary focus:ring-primary" />
                   {unit}
                 </label>
               ))}
@@ -418,46 +418,46 @@ export default function Products() {
             <Field label="Price per Piece (UGX)" required>
               <input type="number" step="0.01" min="0" value={form.price_per_piece} onChange={(e) => setForm({ ...form, price_per_piece: e.target.value })} className={inputClass + ' w-full'} />
             </Field>
-            <div className="col-span-2 flex items-center text-sm text-zinc-500 mt-1">
+            <div className="col-span-2 flex items-center text-sm text-text mt-1">
               Sold by piece only – unit selection is hidden in the POS for this product type.
             </div>
           </div>
         )}
 
         <div className="flex gap-3 mt-6">
-          <button type="submit" className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 px-6 rounded-xl transition-colors shadow-sm">
+          <button type="submit" className="bg-primary hover:bg-primary-hover text-white font-semibold py-2.5 px-6 rounded-xl transition-colors shadow-sm">
             {editing ? 'Update' : 'Add Product'}
           </button>
-          {editing && <button type="button" onClick={resetForm} className="bg-zinc-200 hover:bg-zinc-300 text-zinc-700 font-medium py-2.5 px-6 rounded-xl transition-colors">Cancel</button>}
+          {editing && <button type="button" onClick={resetForm} className="bg-border hover:bg-border-dark text-text-strong font-medium py-2.5 px-6 rounded-xl transition-colors">Cancel</button>}
         </div>
       </form>
 
       {/* Product table */}
-      <div className="bg-white border border-zinc-200 rounded-2xl shadow-sm overflow-hidden">
+      <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">
-            <thead className="bg-zinc-50 border-b border-zinc-200">
+            <thead className="bg-background border-b border-border">
               <tr>
-                <th className="px-4 py-3 text-left font-medium text-zinc-600">Name</th>
-                <th className="px-4 py-3 text-left font-medium text-zinc-600">Category</th>
-                <th className="px-4 py-3 text-left font-medium text-zinc-600">SKU</th>
-                <th className="px-4 py-3 text-center font-medium text-zinc-600">Stock</th>
-                <th className="px-4 py-3 text-center font-medium text-zinc-600">Type</th>
-                <th className="px-4 py-3 text-center font-medium text-zinc-600">Methods</th>
-                <th className="px-4 py-3 text-center font-medium text-zinc-600">Actions</th>
+                <th className="px-4 py-3 text-left font-medium text-text">Name</th>
+                <th className="px-4 py-3 text-left font-medium text-text">Category</th>
+                <th className="px-4 py-3 text-left font-medium text-text">SKU</th>
+                <th className="px-4 py-3 text-center font-medium text-text">Stock</th>
+                <th className="px-4 py-3 text-center font-medium text-text">Type</th>
+                <th className="px-4 py-3 text-center font-medium text-text">Methods</th>
+                <th className="px-4 py-3 text-center font-medium text-text">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-100">
+            <tbody className="divide-y divide-border">
               {products.map(product => (
-                <tr key={product.id} className="hover:bg-zinc-50 transition-colors">
-                  <td className="px-4 py-3 font-medium text-zinc-800">
+                <tr key={product.id} className="hover:bg-background transition-colors">
+                  <td className="px-4 py-3 font-medium text-heading">
                     {product.name}
                     {product.attributes?.imei && (
-                      <div className="text-xs text-zinc-400 font-normal mt-0.5">IMEI: {product.attributes.imei}</div>
+                      <div className="text-xs text-text-muted font-normal mt-0.5">IMEI: {product.attributes.imei}</div>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-zinc-600">{product.category || '-'}</td>
-                  <td className="px-4 py-3 text-zinc-600">{product.sku || '-'}</td>
+                  <td className="px-4 py-3 text-text">{product.category || '-'}</td>
+                  <td className="px-4 py-3 text-text">{product.sku || '-'}</td>
                   <td className="px-4 py-3 text-center">
                     <span className="inline-flex items-center gap-1">
                       {product.stock_quantity}
@@ -466,16 +466,16 @@ export default function Products() {
                       )}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-center text-zinc-600">{productTypeLabel(product)}</td>
-                  <td className="px-4 py-3 text-center text-zinc-600">{(product.active_pricing_methods || []).join(', ')}</td>
+                  <td className="px-4 py-3 text-center text-text">{productTypeLabel(product)}</td>
+                  <td className="px-4 py-3 text-center text-text">{(product.active_pricing_methods || []).join(', ')}</td>
                   <td className="px-4 py-3 text-center">
-                    <button onClick={() => editProduct(product)} className="text-emerald-600 hover:text-emerald-700 font-medium mr-3 transition-colors">Edit</button>
+                    <button onClick={() => editProduct(product)} className="text-primary hover:text-primary-hover font-medium mr-3 transition-colors">Edit</button>
                     <button onClick={() => handleDelete(product.id)} className="text-red-500 hover:text-red-600 font-medium transition-colors">Hide</button>
                   </td>
                 </tr>
               ))}
               {products.length === 0 && (
-                <tr><td colSpan={7} className="px-4 py-8 text-center text-zinc-400">No products found.</td></tr>
+                <tr><td colSpan={7} className="px-4 py-8 text-center text-text-muted">No products found.</td></tr>
               )}
             </tbody>
           </table>
