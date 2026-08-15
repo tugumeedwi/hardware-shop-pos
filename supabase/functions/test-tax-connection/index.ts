@@ -1,5 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
-import { getMemberContext, isOwner } from '../_shared/auth.ts'
+import { getMemberContext, isOwner, getTaxAuthToken } from '../_shared/auth.ts'
 import { safeEndpoint } from '../_shared/ssrf.ts'
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
@@ -52,11 +52,12 @@ Deno.serve(async (req) => {
   try {
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 8000)
+    const authToken = await getTaxAuthToken(supabase, tenantId)
     const res = await fetch(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...(tenant.tax_config?.auth_token ? { Authorization: `Bearer ${tenant.tax_config.auth_token}` } : {})
+        ...(authToken ? { Authorization: `Bearer ${authToken}` } : {})
       },
       body: JSON.stringify({ probe: true }),
       signal: controller.signal

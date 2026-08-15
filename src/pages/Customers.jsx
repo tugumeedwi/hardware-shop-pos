@@ -5,6 +5,17 @@ import { useRealtimeSubscription } from '../hooks/useRealtime'
 import { logActivity } from '../utils/activityLogger'
 import { normalisePhone, formatPhone } from '../utils/phoneUtils'
 
+const inputClass = 'border border-zinc-300 rounded-xl px-4 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400'
+
+const Field = ({ label, required, children }) => (
+  <label className="block">
+    <span className="block text-sm font-medium text-zinc-600 mb-1">
+      {label} {required && <span className="text-red-500">*</span>}
+    </span>
+    {children}
+  </label>
+)
+
 export default function Customers() {
   const [customers, setCustomers] = useState([])
   const [loading, setLoading] = useState(true)
@@ -22,7 +33,10 @@ export default function Customers() {
     setLoading(false)
   }
 
-  useEffect(() => { fetchCustomers() }, [])
+  useEffect(() => {
+    const t = setTimeout(fetchCustomers, 0)
+    return () => clearTimeout(t)
+  }, [])
   useEffect(() => {
     const handler = () => fetchCustomers()
     window.addEventListener('syncCompleted', handler)
@@ -100,10 +114,18 @@ export default function Customers() {
       <form onSubmit={handleSave} className="bg-white border border-zinc-200 rounded-2xl shadow-sm p-6 mb-8 max-w-2xl">
         <h2 className="text-lg font-semibold text-zinc-800 mb-4">{editing ? 'Edit Customer' : 'Add New Customer'}</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <input type="text" placeholder="Full Name *" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="border border-zinc-300 rounded-xl px-4 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400" required />
-          <input type="text" placeholder="Phone (e.g. 0712345678)" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="border border-zinc-300 rounded-xl px-4 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400" />
-          <input type="number" placeholder="Credit Limit" value={form.credit_limit} onChange={(e) => setForm({ ...form, credit_limit: e.target.value })} className="border border-zinc-300 rounded-xl px-4 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400" />
-          <input type="text" placeholder="Notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="border border-zinc-300 rounded-xl px-4 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400" />
+          <Field label="Full Name" required>
+            <input type="text" placeholder="e.g. John Mukasa" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputClass + ' w-full'} required />
+          </Field>
+          <Field label="Phone">
+            <input type="text" placeholder="e.g. 0712345678" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className={inputClass + ' w-full'} />
+          </Field>
+          <Field label="Credit Limit">
+            <input type="number" min="0" placeholder="0" value={form.credit_limit} onChange={(e) => setForm({ ...form, credit_limit: e.target.value })} className={inputClass + ' w-full'} />
+          </Field>
+          <Field label="Notes">
+            <input type="text" placeholder="Any extra info" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className={inputClass + ' w-full'} />
+          </Field>
         </div>
         <div className="flex gap-3 mt-6">
           <button type="submit" className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 px-6 rounded-xl transition-colors shadow-sm">

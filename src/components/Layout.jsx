@@ -16,6 +16,9 @@ export default function Layout({ children }) {
   const HARD_BLOCKED_STATUSES = ['past_due', 'unpaid', 'cancelled', 'expired']
   const needsSubscription = tenant && BAD_SUBSCRIPTION_STATUSES.includes(tenant.subscription_status)
   const subscriptionBlocked = tenant && HARD_BLOCKED_STATUSES.includes(tenant.subscription_status)
+  // Platform admins count as owners for tenant pages (they keep full shop-owner
+  // access in addition to the /admin/payments platform role).
+  const isOwner = tenant?.membership_role === 'owner' || profile?.role === 'platform_admin'
 
   const handleLogout = async () => {
     // Best-effort flush of pending offline sales before the session dies;
@@ -36,9 +39,9 @@ export default function Layout({ children }) {
         <div className="bg-amber-50 border-b border-amber-200 px-4 py-2.5 flex items-center justify-between gap-4">
           <span className="text-sm text-amber-800">
             Your subscription is <span className="font-semibold">{tenant.subscription_status}</span>.
-            {tenant?.membership_role !== 'owner' && ' Please ask the shop owner to renew it.'}
+            {!isOwner && ' Please ask the shop owner to renew it.'}
           </span>
-          {tenant?.membership_role === 'owner' && (
+          {isOwner && (
             <Link to="/pricing" className="text-sm font-semibold text-amber-900 bg-white border border-amber-300 rounded-lg px-3 py-1 hover:bg-amber-100 transition-colors shrink-0">
               View plans
             </Link>
@@ -60,7 +63,7 @@ export default function Layout({ children }) {
               Your subscription is {tenant.subscription_status}. Access is paused until it is
               renewed to keep your shop data safe.
             </p>
-            {tenant?.membership_role === 'owner' ? (
+            {isOwner ? (
               <div className="pt-2 space-y-3">
                 <Link
                   to="/pricing"
@@ -113,7 +116,10 @@ export default function Layout({ children }) {
           <Link to="/sales" className="text-gray-700 hover:text-blue-600">Sales</Link>
           <Link to="/dashboard" className="text-gray-700 hover:text-blue-600">Dashboard</Link>
           <Link to="/payments" className="text-gray-700 hover:text-blue-600">Payments</Link>
-          {tenant?.membership_role === 'owner' && (
+          {profile?.role === 'platform_admin' && (
+            <Link to="/admin/payments" className="text-gray-700 hover:text-blue-600">Payments Admin</Link>
+          )}
+          {isOwner && (
             <>
               <Link to="/products" className="text-gray-700 hover:text-blue-600">Products</Link>
               <Link to="/customers" className="text-gray-700 hover:text-blue-600">Customers</Link>

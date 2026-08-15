@@ -92,3 +92,52 @@ export async function getTenantId(supabaseClient: any) {
   if (error || !data) throw new Error('Tenant not found')
   return data as string
 }
+
+/**
+ * Verifies the caller is a platform admin (profiles.role = 'platform_admin').
+ * Platform admins are not necessarily members of any tenant, so this uses the
+ * profile table rather than tenant_memberships. Returns the verified user on
+ * success, or an error message for the 4xx response.
+ */
+export async function getPlatformAdminUser(
+  req: Request,
+  supabase: SupabaseClient
+): Promise<{ user: { id: string } } | { error: string }> {
+  const token = getBearerToken(req)
+  if (!token) return { error: 'Missing Authorization header' }
+
+  const { data: { user }, error } = await supabase.auth.getUser(token)
+  if (error || !user) {
+    return { error: error?.message || 'Invalid session token' }
+  }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  if (profile?.role !== 'platform_admin') {
+    return { error: 'Platform admin permissions required' }
+  }
+
+  return { user: { id: user.id } }
+}
+
+/**
+ * Reads a tenant's tax-provider bearer token from Supabase Vault (encrypted),
+ * never from tenants.tax_config (which is members-readable).
+ */
+export async function getTaxAuthToken(
+  supabase: SupabaseClient,
+  tenantId: string
+): Promise<string | undefined> {
+  const { data, error } = await supabase.rpc('vault_get_secret', {
+    secret_name: `tax_auth_token_${tenantId}`
+  })
+  if (error) {
+    console.warn('[getTaxAuthToken] vault read failed:', error.message)
+    return undefined
+  }
+  return (data as string) || undefined
+}

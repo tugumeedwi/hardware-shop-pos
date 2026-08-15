@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../api/supabaseClient'
 import toast from 'react-hot-toast'
@@ -22,14 +22,14 @@ export function useSessionTimeout(timeoutMinutes = 15, warningMinutes = 1) {
   const logoutTimeoutRef = useRef(null)
   const warningGivenRef = useRef(false)
 
-  const clearTimers = () => {
+  const clearTimers = useCallback(() => {
     if (warningTimeoutRef.current) clearTimeout(warningTimeoutRef.current)
     if (logoutTimeoutRef.current) clearTimeout(logoutTimeoutRef.current)
     warningGivenRef.current = false
     setShowWarning(false)
-  }
+  }, [])
 
-  const resetTimer = () => {
+  const resetTimer = useCallback(() => {
     clearTimers()
 
     // Set warning timer
@@ -53,7 +53,7 @@ export function useSessionTimeout(timeoutMinutes = 15, warningMinutes = 1) {
       toast.error('Logged out due to inactivity')
       navigate('/login')
     }, logoutTime)
-  }
+  }, [clearTimers, timeoutMinutes, warningMinutes, navigate])
 
   useEffect(() => {
     // Events that indicate user activity
@@ -63,8 +63,9 @@ export function useSessionTimeout(timeoutMinutes = 15, warningMinutes = 1) {
       resetTimer()
     }
 
-    // Start the timer
-    resetTimer()
+    // Start the timer (deferred so setState never runs synchronously inside
+    // the effect body — clearTimers() resets the warning flag).
+    const t = setTimeout(resetTimer, 0)
 
     // Listen for activity
     events.forEach(event => {
@@ -72,12 +73,13 @@ export function useSessionTimeout(timeoutMinutes = 15, warningMinutes = 1) {
     })
 
     return () => {
+      clearTimeout(t)
       clearTimers()
       events.forEach(event => {
         document.removeEventListener(event, handleActivity)
       })
     }
-  }, [timeoutMinutes, warningMinutes])
+  }, [resetTimer, clearTimers])
 
   return { showWarning, resetTimer }
 }

@@ -61,7 +61,10 @@ export default function Products() {
     setLoading(false)
   }
 
-  useEffect(() => { fetchProducts() }, [])
+  useEffect(() => {
+    const t = setTimeout(fetchProducts, 0)
+    return () => clearTimeout(t)
+  }, [])
   useEffect(() => {
     const handler = () => fetchProducts()
     window.addEventListener('syncCompleted', handler)
@@ -102,26 +105,30 @@ export default function Products() {
     })
   }
 
-  // Auto-derive prices for hardware products (box/sqm/kg from piece price)
+  // Auto-derive prices for hardware products (box/sqm/kg from piece price).
+  // Deferred so setState never runs synchronously within the effect body.
   useEffect(() => {
     if (!isHardware) return
 
-    const piecePrice = parseFloat(form.price_per_piece)
-    if (isNaN(piecePrice) || piecePrice <= 0) return
+    const t = setTimeout(() => {
+      const piecePrice = parseFloat(form.price_per_piece)
+      if (isNaN(piecePrice) || piecePrice <= 0) return
 
-    const ppb = parseFloat(form.pieces_per_box)
-    const m2pp = parseFloat(form.m2_per_piece)
-    const ppkg = parseFloat(form.pieces_per_kg)
+      const ppb = parseFloat(form.pieces_per_box)
+      const m2pp = parseFloat(form.m2_per_piece)
+      const ppkg = parseFloat(form.pieces_per_kg)
 
-    if (form.is_tile && form.active_methods.box && ppb > 0 && !form.price_per_box) {
-      setForm(prev => ({ ...prev, price_per_box: (piecePrice * ppb).toFixed(2) }))
-    }
-    if (form.is_tile && form.active_methods.sqm && m2pp > 0 && !form.price_per_sqm) {
-      setForm(prev => ({ ...prev, price_per_sqm: (piecePrice / m2pp).toFixed(2) }))
-    }
-    if (form.active_methods.kg && ppkg > 0 && !form.price_per_kg) {
-      setForm(prev => ({ ...prev, price_per_kg: (piecePrice * ppkg).toFixed(2) }))
-    }
+      if (form.is_tile && form.active_methods.box && ppb > 0 && !form.price_per_box) {
+        setForm(prev => ({ ...prev, price_per_box: (piecePrice * ppb).toFixed(2) }))
+      }
+      if (form.is_tile && form.active_methods.sqm && m2pp > 0 && !form.price_per_sqm) {
+        setForm(prev => ({ ...prev, price_per_sqm: (piecePrice / m2pp).toFixed(2) }))
+      }
+      if (form.active_methods.kg && ppkg > 0 && !form.price_per_kg) {
+        setForm(prev => ({ ...prev, price_per_kg: (piecePrice * ppkg).toFixed(2) }))
+      }
+    }, 0)
+    return () => clearTimeout(t)
   }, [isHardware, form.is_tile, form.price_per_piece, form.pieces_per_box, form.m2_per_piece, form.pieces_per_kg,
      form.active_methods.box, form.active_methods.sqm, form.active_methods.kg, form.price_per_box, form.price_per_sqm, form.price_per_kg])
 

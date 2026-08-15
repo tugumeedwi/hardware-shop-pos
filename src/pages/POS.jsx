@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Html5Qrcode } from 'html5-qrcode'
 import { supabase } from '../api/supabaseClient'
 import { useAuth } from '../context/AuthContext'
@@ -89,14 +89,14 @@ export default function POS() {
       window.removeEventListener('online', handleOnline)
       window.removeEventListener('offline', handleOffline)
     }
-  }, [])
+  }, [handleOnline, handleOffline, loadProducts])
 
   // auto-refresh on sync completion
   useEffect(() => {
     const handler = () => loadProducts()
     window.addEventListener('syncCompleted', handler)
     return () => window.removeEventListener('syncCompleted', handler)
-  }, [])
+  }, [loadProducts])
 
   // Barcode scanner via global keydown (USB wedge). Buffers keystrokes and
   // only handles a scan once the device sends Enter, using the ref so the
@@ -161,7 +161,7 @@ export default function POS() {
       if (timer) clearTimeout(timer)
       if (scanner) scanner.stop().catch(() => {})
     }
-  }, [cameraOpen])
+  }, [cameraOpen, cameraRegionId])
 
   // Warn before leaving if cart has items
   useEffect(() => {
@@ -180,10 +180,10 @@ export default function POS() {
     loadProducts()
   })
 
-  const handleOnline = () => { setIsOffline(false); loadProducts() }
-  const handleOffline = () => setIsOffline(true)
+  const handleOnline = useCallback(() => { setIsOffline(false); loadProducts() }, [loadProducts])
+  const handleOffline = useCallback(() => setIsOffline(true), [])
 
-  const loadProducts = async () => {
+  const loadProducts = useCallback(async () => {
     if (navigator.onLine) {
       const { data } = await supabase.from('products').select('*').eq('is_deleted', false)
       if (data && data.length > 0) {
@@ -201,7 +201,7 @@ export default function POS() {
     }
     const localProducts = await db.products.toArray()
     setProducts(localProducts)
-  }
+  }, [])
 
   const filteredProducts = products.filter(p =>
     p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -209,7 +209,7 @@ export default function POS() {
   )
 
   // ---- Cart handlers ----
-  const addToCart = (product, overrides = {}) => {
+  function addToCart(product, overrides = {}) {
     const activeMethods = product.active_pricing_methods
     if (!activeMethods || activeMethods.length === 0) {
       toast.error('No selling method enabled')
@@ -384,6 +384,16 @@ export default function POS() {
         saleCompletedOnline = true
       } catch (error) {
         console.error('Online sale failed:', error)
+        // A server-side rejection (credit limit, insufficient stock, tamper
+        // check, missing product) must NOT be silently parked in the offline
+        // queue – it will never succeed there and the cashier would believe
+        // the sale was saved. Only network-style failures should fall through
+        // to the offline path (idempotency_key makes retries safe).
+        const msg = String(error?.message || '')
+        if (/credit limit|insufficient stock|tampering|total mismatch|not found|no active tenant/i.test(msg)) {
+          setProcessing(false)
+          return toast.error(msg)
+        }
         toast.error('Sale could not be completed. Please try again.')
       }
     }
@@ -411,11 +421,14 @@ export default function POS() {
   }
 
   useEffect(() => {
-    if (paymentMethod !== 'credit') {
-      setAmountPaid(totalAfterDiscount.toFixed(2))
-    } else {
-      setAmountPaid('')
-    }
+    const t = setTimeout(() => {
+      if (paymentMethod !== 'credit') {
+        setAmountPaid(totalAfterDiscount.toFixed(2))
+      } else {
+        setAmountPaid('')
+      }
+    }, 0)
+    return () => clearTimeout(t)
   }, [paymentMethod, totalAfterDiscount])
 
   return (

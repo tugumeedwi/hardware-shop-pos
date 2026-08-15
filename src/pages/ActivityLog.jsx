@@ -15,7 +15,10 @@ export default function ActivityLog() {
     setLoading(false)
   }
 
-  useEffect(() => { fetchLogs() }, [])
+  useEffect(() => {
+    const t = setTimeout(fetchLogs, 0)
+    return () => clearTimeout(t)
+  }, [])
 
   if (loading) return <div className="p-8 text-center text-zinc-500">Loading activity...</div>
 

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../api/supabaseClient'
 import { printThermal, initQZ } from '../utils/thermalPrinter'
 
@@ -6,17 +6,9 @@ export default function Receipt({ saleId, onClose }) {
   const [sale, setSale] = useState(null)
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
-const [thermalReady, setThermalReady] = useState(false)
+  const [thermalReady, setThermalReady] = useState(false)
 
-  useEffect(() => {
-    if (!saleId) return
-    fetchSale()
-  }, [saleId])
-useEffect(() => {
-  initQZ().then(ok => setThermalReady(ok))
-}, [])
-
-  const fetchSale = async () => {
+  const fetchSale = useCallback(async () => {
     // Fetch sale with customer
     const { data: saleData, error: saleError } = await supabase
       .from('sales')
@@ -39,7 +31,7 @@ useEffect(() => {
     setSale(saleData)
     setItems(itemsData || [])
     setLoading(false)
-  }
+  }, [saleId])
 
   const handlePrint = () => {
     window.print()
@@ -66,6 +58,15 @@ const handleThermalPrint = () => {
   }
   printThermal(receiptData)
 }
+
+  useEffect(() => {
+    if (!saleId) return
+    const t = setTimeout(fetchSale, 0)
+    return () => clearTimeout(t)
+  }, [saleId, fetchSale])
+  useEffect(() => {
+    initQZ().then(ok => setThermalReady(ok))
+  }, [])
 
 
   if (loading) return <div className="p-4 text-center">Loading receipt...</div>

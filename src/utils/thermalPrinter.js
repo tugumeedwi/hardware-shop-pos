@@ -12,6 +12,7 @@ let qzReady = false
 function sanitizeESC(str) {
   if (!str) return ''
   // Remove control characters (0x00-0x1F, 0x7F) except 0x09 (tab), 0x0A (LF), 0x0D (CR)
+  // eslint-disable-next-line no-control-regex
   return str.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
 }
 

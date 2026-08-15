@@ -158,7 +158,11 @@ async function syncPendingSale(saleData) {
   }
 
   if (saleId) {
-    await queueTaxInvoiceAfterSale(saleId)
+    // Quotations are not invoices – only completed POS sales are queued for
+    // the e-invoicing provider.
+    if (saleData.type !== 'quotation') {
+      await queueTaxInvoiceAfterSale(saleId)
+    }
   }
 
   // Remove from pendingSales

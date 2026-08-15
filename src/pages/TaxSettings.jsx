@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../api/supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
@@ -14,6 +14,7 @@ export default function TaxSettings() {
   const [taxProvider, setTaxProvider] = useState('ura_fdn')
   const [endpointUrl, setEndpointUrl] = useState('https://ura.example.com/api/invoice')
   const [authToken, setAuthToken] = useState('')
+  const [hasToken, setHasToken] = useState(false)
 
   const [certFile, setCertFile] = useState(null)
   const [certPassword, setCertPassword] = useState('')
@@ -26,10 +27,15 @@ export default function TaxSettings() {
     setTaxDeviceSerial(data.tax_device_serial || '')
     setTaxProvider(data.tax_provider || 'ura_fdn')
     setEndpointUrl(data.tax_config?.endpoint_url || 'https://ura.example.com/api/invoice')
-    setAuthToken(data.tax_config?.auth_token || '')
+    // The auth token is stored encrypted in Vault, never in tax_config.
+    setAuthToken('')
+    supabase
+      .rpc('has_tax_auth_token')
+      .then(({ data }) => setHasToken(!!data))
+      .catch(() => setHasToken(false))
   }
 
-  const fetchPendingCount = async () => {
+  const fetchPendingCount = useCallback(async () => {
     if (!tenant?.id) return
     const { count } = await supabase
       .from('tax_invoices')
@@ -37,27 +43,30 @@ export default function TaxSettings() {
       .eq('tenant_id', tenant.id)
       .in('status', ['pending', 'failed'])
     setPendingCount(count || 0)
-  }
+  }, [tenant])
 
   useEffect(() => {
     if (tenant?.id) {
-      setLoadingTax(true)
-      supabase
-        .from('tenants')
-        .select('tax_enabled, tax_tin, tax_device_serial, tax_provider, tax_config')
-        .eq('id', tenant.id)
-        .single()
-        .then(({ data, error }) => {
-          if (error) {
-            console.warn('Failed to load tax settings:', error.message)
-            return
-          }
-          if (data) loadTaxSettings(data)
-        })
-        .finally(() => setLoadingTax(false))
-      fetchPendingCount()
+      const t = setTimeout(() => {
+        setLoadingTax(true)
+        supabase
+          .from('tenants')
+          .select('tax_enabled, tax_tin, tax_device_serial, tax_provider, tax_config')
+          .eq('id', tenant.id)
+          .single()
+          .then(({ data, error }) => {
+            if (error) {
+              console.warn('Failed to load tax settings:', error.message)
+              return
+            }
+            if (data) loadTaxSettings(data)
+          })
+          .finally(() => setLoadingTax(false))
+        fetchPendingCount()
+      }, 0)
+      return () => clearTimeout(t)
     }
-  }, [tenant?.id])
+  }, [tenant?.id, fetchPendingCount])
 
   const saveTaxSettings = async () => {
     if (!tenant?.id) return toast.error('No active tenant')
@@ -72,13 +81,21 @@ export default function TaxSettings() {
           tax_provider: taxProvider,
           tax_config: {
             endpoint_url: endpointUrl.trim() || 'https://ura.example.com/api/invoice',
-            auth_token: authToken.trim() || null,
             tax_rate: 0.18
           }
         })
         .eq('id', tenant.id)
 
       if (error) throw error
+
+      // The auth token is a credential: store it encrypted in Vault via the
+      // owner-only RPC. Empty input clears it.
+      if (authToken) {
+        const { error: tokenError } = await supabase.rpc('save_tax_auth_token', { p_token: authToken.trim() })
+        if (tokenError) throw tokenError
+        setHasToken(true)
+        setAuthToken('')
+      }
       toast.success('Tax settings saved')
     } catch (err) {
       console.error('Save tax settings error:', err)
@@ -215,11 +232,16 @@ export default function TaxSettings() {
               <label className="block text-sm font-medium text-zinc-700 mb-1">Auth token (optional)</label>
               <input
                 type="password"
-                placeholder="Bearer token for the provider"
+                placeholder={hasToken ? 'Stored securely – enter a new value to replace it' : 'Bearer token for the provider'}
                 value={authToken}
                 onChange={(e) => setAuthToken(e.target.value)}
                 className={inputClass}
               />
+              {hasToken && (
+                <p className="text-xs text-zinc-500 mt-1">
+                  A token is set and stored encrypted in Vault. Leave the field empty to keep it.
+                </p>
+              )}
             </div>
 
             <div className="flex flex-wrap gap-3 pt-2">

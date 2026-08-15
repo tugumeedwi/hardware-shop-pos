@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { supabase } from '../api/supabaseClient'
+import db from '../db/localDatabase'
 
 const AuthContext = createContext()
 
@@ -9,6 +10,7 @@ export function AuthProvider({ children }) {
   const [tenants, setTenants] = useState([])
   const [tenant, setTenant] = useState(null)
   const [needsTenantSelection, setNeedsTenantSelection] = useState(false)
+  const [isRecoverySession, setIsRecoverySession] = useState(false)
   const [loading, setLoading] = useState(true)
   const lastUserIdRef = useRef(null)
 
@@ -36,7 +38,11 @@ export function AuthProvider({ children }) {
 
     supabase.auth.getSession().then(({ data: { session } }) => resolve(session))
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+      // A magic-link / reset-email click arrives as a signed-in session flagged
+      // PASSWORD_RECOVERY; keep the user on the reset page instead of bouncing
+      // them to the tenant-selected POS.
+      setIsRecoverySession(event === 'PASSWORD_RECOVERY')
       resolve(session)
     })
 
@@ -86,14 +92,65 @@ export function AuthProvider({ children }) {
 
     if (error) {
       console.warn('Failed to load tenant memberships:', error.message)
+      // Network blip? Fall back to the cached memberships so an already-signed-in
+      // user can still pick up where they left off offline.
+      const cached = await loadCachedMemberships()
+      if (cached.length > 0) {
+        setTenants(cached)
+        await resolveChosenTenant(cached, user)
+        return
+      }
       setTenants([])
       setNeedsTenantSelection(true)
       return
     }
 
     const memberships = data || []
+    await cacheMemberships(memberships)
     setTenants(memberships)
 
+    await resolveChosenTenant(memberships, user)
+  }
+
+  async function cacheMemberships(memberships) {
+    try {
+      await db.memberships.clear()
+      await db.memberships.bulkPut(
+        memberships.map(m => ({
+          tenant_id: m.tenant_id,
+          role: m.role,
+          tenants: m.tenants
+        }))
+      )
+    } catch (cacheErr) {
+      console.warn('Failed to cache memberships:', cacheErr.message)
+    }
+  }
+
+  async function loadCachedMemberships() {
+    try {
+      const rows = await db.memberships.toArray()
+      return rows.map(m => ({
+        tenant_id: m.tenant_id,
+        role: m.role,
+        tenants: {
+          id: m.tenant_id,
+          name: m.tenants?.name || null,
+          industry: m.tenants?.industry || null,
+          business_rules: m.tenants?.business_rules || {},
+          business_type: m.tenants?.business_type || 'hardware',
+          subscription_status: m.tenants?.subscription_status || null,
+          subscription_end_date: m.tenants?.subscription_end_date || null,
+          tax_enabled: m.tenants?.tax_enabled || false
+        }
+      }))
+    } catch (cacheErr) {
+      console.warn('Failed to read cached memberships:', cacheErr.message)
+      return []
+    }
+  }
+
+  async function resolveChosenTenant(memberships, user) {
     if (memberships.length === 0) {
       setTenant(null)
       setNeedsTenantSelection(true)
@@ -164,10 +221,14 @@ export function AuthProvider({ children }) {
     tenant,
     tenants,
     needsTenantSelection,
+    isRecoverySession,
     selectTenant
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 
+// react-refresh: it is conventional to colocate the context hook with its
+// provider; disabling fast-refresh for this single export is intentional.
+// eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => useContext(AuthContext)

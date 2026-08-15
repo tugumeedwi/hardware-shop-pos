@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { normalisePhone } from '../utils/phoneUtils'
+import db from '../db/localDatabase'
 
 export default function QuotationForm() {
   const { profile } = useAuth()
@@ -19,18 +20,20 @@ export default function QuotationForm() {
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
 
-  useEffect(() => { loadProducts() }, [])
-
-  const loadProducts = async () => {
+  async function loadProducts() {
     if (navigator.onLine) {
       const { data } = await supabase.from('products').select('*').eq('is_deleted', false)
       if (data) setProducts(data)
     } else {
-      const db = (await import('../db/localDatabase')).default
       const local = await db.products.toArray()
       setProducts(local)
     }
   }
+
+  useEffect(() => {
+    const t = setTimeout(loadProducts, 0)
+    return () => clearTimeout(t)
+  }, [])
 
   const filteredProducts = products.filter(p =>
     p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -87,6 +90,7 @@ export default function QuotationForm() {
     setSaving(true)
 
     const payload = {
+      idempotency_key: crypto.randomUUID(),
       cashier_id: profile.id,
       customer_id: selectedCustomer.id,
       type: 'quotation',
@@ -110,36 +114,16 @@ export default function QuotationForm() {
     }
 
     if (navigator.onLine) {
-      const { data: sale, error } = await supabase.from('sales').insert({
-        cashier_id: payload.cashier_id,
-        customer_id: payload.customer_id,
-        type: payload.type,
-        status: payload.status,
-        payment_method: payload.payment_method,
-        discount_total: payload.discount_total,
-        total_amount: payload.total_amount,
-        amount_paid: payload.amount_paid,
-        notes: payload.notes,
-        expiry_date: payload.expiry_date,
-        offline_created_at: payload.offline_created_at,
-        sync_status: 'synced'
-      }).select('id').single()
-
+      // Server-side creation is atomic (sale + items + stock check in one RPC)
+      // and idempotency-keyed, so a retry can never double-save.
+      const { error } = await supabase.rpc('create_sale', { sale_data: payload })
       if (error) {
         console.error('Save quotation error:', error)
         setSaving(false)
-        return toast.error('Failed to save quotation')
-      }
-      const itemsToInsert = payload.items.map(item => ({ ...item, sale_id: sale.id }))
-      const { error: itemsError } = await supabase.from('sale_items').insert(itemsToInsert)
-      if (itemsError) {
-        console.error('Insert items error:', itemsError)
-        setSaving(false)
-        return toast.error('Failed to save quotation items')
+        return toast.error(error.message || 'Failed to save quotation')
       }
       toast.success('Quotation saved')
     } else {
-      const db = (await import('../db/localDatabase')).default
       await db.pendingSales.add({ saleData: payload, status: 'pending' })
       await db.syncQueue.add({
         tableName: 'sales',

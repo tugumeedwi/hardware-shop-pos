@@ -1,6 +1,6 @@
 // @deno-types="https://deno.land/x/supabase@2.x/mod.ts"
 import { createClient } from 'npm:@supabase/supabase-js@2'
-import { getMemberContext, isOwner } from '../_shared/auth.ts'
+import { getMemberContext, isOwner, getTaxAuthToken } from '../_shared/auth.ts'
 import { safeEndpoint } from '../_shared/ssrf.ts'
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
@@ -217,7 +217,7 @@ Deno.serve(async (req) => {
 
   const saleItems = sale.sale_items ?? []
   const { data: customer } = sale?.customer_id
-    ? await supabase.from('customers').select('name, phone').eq('id', sale.customer_id).single()
+    ? await supabase.from('customers').select('name, phone').eq('id', sale.customer_id).eq('tenant_id', tenantId).single()
     : { data: null }
 
   const { jsonPayload, xmlPayload } = buildInvoiceRequest({
@@ -237,7 +237,9 @@ Deno.serve(async (req) => {
     return json({ success: false, error: endpointError }, 422)
   }
   const headers = { 'Content-Type': 'application/json' }
-  const authToken = taxInvoice.tenant?.tax_config?.auth_token
+  // The credential lives in Vault (encrypted); tax_config only holds
+  // non-secret settings.
+  const authToken = await getTaxAuthToken(supabase, tenantId)
   if (authToken) headers.Authorization = `Bearer ${authToken}`
 
   console.log(`[send-tax-invoice] Sending ${taxInvoice.invoice_number} to ${endpoint}`)

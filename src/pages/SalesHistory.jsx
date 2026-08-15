@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../api/supabaseClient'
 import Receipt from '../components/Receipt'
 import toast from 'react-hot-toast'
@@ -13,7 +13,7 @@ export default function SalesHistory() {
   const [customerFilter, setCustomerFilter] = useState('')
   const [totals, setTotals] = useState({ total: 0, cash: 0, mobile_money: 0, credit: 0 })
 
-  const fetchSales = async () => {
+  const fetchSales = useCallback(async () => {
     setLoading(true)
     let query = supabase
       .from('sales')
@@ -52,14 +52,17 @@ export default function SalesHistory() {
       credit: filtered.filter(s => s.payment_method === 'credit').reduce((sum, s) => sum + (s.total_amount || 0), 0)
     })
     setLoading(false)
-  }
+  }, [dateFrom, dateTo, paymentFilter, customerFilter])
 
-  useEffect(() => { fetchSales() }, [dateFrom, dateTo, paymentFilter])
+  useEffect(() => {
+    const t = setTimeout(fetchSales, 0)
+    return () => clearTimeout(t)
+  }, [dateFrom, dateTo, paymentFilter, fetchSales])
   useEffect(() => {
     const handler = () => fetchSales()
     window.addEventListener('syncCompleted', handler)
     return () => window.removeEventListener('syncCompleted', handler)
-  }, [])
+  }, [fetchSales])
 
   const applyCustomerFilter = () => fetchSales()
 

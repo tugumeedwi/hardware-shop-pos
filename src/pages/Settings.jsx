@@ -3,17 +3,14 @@ import toast from 'react-hot-toast'
 import { supabase } from '../api/supabaseClient'
 
 export default function Settings() {
-  const [autoPrintBrowser, setAutoPrintBrowser] = useState(false)
-  const [autoPrintThermal, setAutoPrintThermal] = useState(false)
+  const [autoPrintBrowser, setAutoPrintBrowser] = useState(() => localStorage.getItem('autoPrintBrowser') === 'true')
+  const [autoPrintThermal, setAutoPrintThermal] = useState(() => localStorage.getItem('autoPrintThermal') === 'true')
 
   // AI usage metering
   const [usage, setUsage] = useState(null)
   const [usageLoading, setUsageLoading] = useState(true)
 
   useEffect(() => {
-    setAutoPrintBrowser(localStorage.getItem('autoPrintBrowser') === 'true')
-    setAutoPrintThermal(localStorage.getItem('autoPrintThermal') === 'true')
-
     supabase.functions
       .invoke('check-usage', {})
       .then(({ data }) => setUsage(data || null))

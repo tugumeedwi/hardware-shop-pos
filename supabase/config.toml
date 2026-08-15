@@ -21,4 +21,12 @@
     verify_jwt = true
   [functions.ura-invoice-cron]
     verify_jwt = false              # Invoked by pg_cron scheduler, not a user
-    schedule = "*/1 * * * *"
+    # NOTE: the cron schedule lives in the ura_invoice_cron_schedule migration
+    # (pg_cron job) and must NOT be duplicated here, or invoices would be
+    # processed twice per tick.
+  [functions.create-payment-request]
+    verify_jwt = true
+  [functions.approve-payment-request]
+    verify_jwt = true
+  [functions.list-pending-payment-requests]
+    verify_jwt = true

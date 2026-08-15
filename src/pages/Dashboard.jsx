@@ -8,9 +8,7 @@ export default function Dashboard() {
   const [totalSales, setTotalSales] = useState(0)
   const [creditOutstanding, setCreditOutstanding] = useState(0)
 
-  useEffect(() => { fetchData() }, [])
-
-  const fetchData = async () => {
+  async function fetchData() {
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
     const { data: sales } = await supabase
       .from('sales')
@@ -18,6 +16,7 @@ export default function Dashboard() {
       .gte('created_at', sevenDaysAgo)
       .eq('type', 'pos')
       .eq('status', 'completed')
+      .limit(2000)
 
     const grouped = {}
     sales?.forEach(s => {
@@ -27,15 +26,20 @@ export default function Dashboard() {
     const chartData = Object.entries(grouped).map(([date, total]) => ({ date, total }))
     setSalesData(chartData)
 
-    const { data: allSales } = await supabase.from('sales').select('total_amount').eq('type', 'pos').eq('status', 'completed')
-    setTotalSales(allSales?.reduce((sum, s) => sum + s.total_amount, 0) || 0)
-
-    const { data: customers } = await supabase.from('customers').select('current_credit_balance')
-    setCreditOutstanding(customers?.reduce((sum, c) => sum + c.current_credit_balance, 0) || 0)
-
-    const { data: expenses } = await supabase.from('expenses').select('amount')
-    setExpensesTotal(expenses?.reduce((sum, e) => sum + e.amount, 0) || 0)
+    // All-time aggregates run server-side so the client never downloads every
+    // sale/customer/expense row.
+    const { data: summary } = await supabase.rpc('dashboard_summary')
+    if (summary) {
+      setTotalSales(summary.total_sales || 0)
+      setCreditOutstanding(summary.credit_outstanding || 0)
+      setExpensesTotal(summary.expenses_total || 0)
+    }
   }
+
+  useEffect(() => {
+    const t = setTimeout(fetchData, 0)
+    return () => clearTimeout(t)
+  }, [])
 
   const profit = totalSales - expensesTotal
 

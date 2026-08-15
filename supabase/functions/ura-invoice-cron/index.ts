@@ -1,4 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
+import { getTaxAuthToken } from '../_shared/auth.ts'
 import { safeEndpoint } from '../_shared/ssrf.ts'
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
@@ -128,11 +129,13 @@ async function sendSingleInvoice(taxInvoice) {
     .from('sales')
     .select('id, customer_id, discount_total, total_amount, created_at, sale_items(product_id, quantity_sold, unit_price, line_total, products:product_id(name, sku))')
     .eq('id', taxInvoice.sale_id)
+    .eq('tenant_id', tenantId)
     .single()
 
   if (!sale) {
-    // A missing linked sale is permanent (the sale was deleted or never
-    // synced) – retrying forever only spams the queue. Mark failed and stop.
+    // A missing linked sale is permanent (the sale was deleted, never synced,
+    // or belongs to a different tenant) – retrying forever only spams the
+    // queue. Mark failed and stop.
     const retry_count = (taxInvoice.retry_count ?? 0) + 1
     await supabase
       .from('tax_invoices')
@@ -143,7 +146,7 @@ async function sendSingleInvoice(taxInvoice) {
 
   const saleItems = sale.sale_items ?? []
   const { data: customer } = sale?.customer_id
-    ? await supabase.from('customers').select('name, phone').eq('id', sale.customer_id).single()
+    ? await supabase.from('customers').select('name, phone').eq('id', sale.customer_id).eq('tenant_id', tenantId).single()
     : { data: null }
 
   const { jsonPayload, xmlPayload } = buildInvoiceRequest({ taxInvoice, sale, saleItems, customer, tenant })
@@ -151,7 +154,9 @@ async function sendSingleInvoice(taxInvoice) {
   // Validate the tenant-controlled endpoint (SSRF guard) before the retry.
   const { url: endpoint, error: endpointError } = safeEndpoint(tenant, DEFAULT_ENDPOINT)
   const headers = { 'Content-Type': 'application/json' }
-  const authToken = tenant.tax_config?.auth_token
+  // The credential lives in Vault (encrypted); tax_config only holds
+  // non-secret settings.
+  const authToken = await getTaxAuthToken(supabase, tenantId)
   if (authToken) headers.Authorization = `Bearer ${authToken}`
 
   if (endpointError) {

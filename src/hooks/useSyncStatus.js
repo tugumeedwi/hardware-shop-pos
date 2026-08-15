@@ -10,7 +10,10 @@ export function useSyncStatus() {
   }
 
   useEffect(() => {
-    refresh()
+    // Initial load: call setState in a promise callback, never synchronously
+    // inside the effect body.
+    db.syncQueue.count().then(setPendingCount)
+
     // Refresh when coming online (after sync manager processes)
     const handleOnline = () => { setTimeout(refresh, 2000) } // wait for sync to finish
     const handleSyncCompleted = () => { refresh() }

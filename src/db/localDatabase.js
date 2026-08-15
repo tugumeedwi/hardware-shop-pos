@@ -44,4 +44,15 @@ db.version(4).stores({
   syncQueue: '++id, tableName, recordId, operation, timestamp, attempts, nextRetryAt'
 });
 
+db.version(5).stores({
+  products: 'id, name, sku, category, is_tile, stock_quantity, price_per_piece, price_per_box, price_per_sqm, price_per_kg, active_pricing_methods, pieces_per_box, m2_per_piece, pieces_per_kg, attributes, is_deleted',
+  customers: 'id, name, phone',
+  pendingSales: '++localId, saleData.offline_created_at, status',
+  syncQueue: '++id, tableName, recordId, operation, timestamp, attempts, nextRetryAt',
+
+  // Cached tenant memberships so a user who is already signed in can open the
+  // app (and select/keep their shop) during a network outage.
+  memberships: 'tenant_id, role'
+});
+
 export default db;

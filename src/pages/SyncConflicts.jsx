@@ -18,7 +18,10 @@ export default function SyncConflicts() {
     setLoading(false)
   }
 
-  useEffect(() => { fetchConflicts() }, [])
+  useEffect(() => {
+    const t = setTimeout(fetchConflicts, 0)
+    return () => clearTimeout(t)
+  }, [])
 
   const resolveConflict = async (id, keepLocal) => {
     const conflict = conflicts.find(c => c.id === id)
@@ -30,7 +33,13 @@ export default function SyncConflicts() {
         toast.error(`Table "${table_name}" is not resolvable from the client`)
         return
       }
-      const local = conflict.local_data
+      // local_data is stored as { operation, payload }; restore the actual row.
+      const local = conflict.local_data.payload || conflict.local_data
+      const isUuid = typeof record_id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(record_id)
+      if (!local || !isUuid) {
+        toast.error('Cannot restore the local version – the original row was never written to the server. Keep the server version or re-enter the record.')
+        return
+      }
       const payload = { ...local }
       delete payload.id
       const { error } = await supabase.from(table_name).update(payload).eq('id', record_id)

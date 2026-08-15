@@ -1,6 +1,5 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../api/supabaseClient'
-import { useAuth } from '../context/AuthContext'
 import { Link } from 'react-router-dom'
 import Receipt from '../components/Receipt'
 import toast from 'react-hot-toast'
@@ -8,39 +7,37 @@ import { useRealtimeSubscription } from '../hooks/useRealtime'
 import { logActivity } from '../utils/activityLogger'
 
 export default function Quotations() {
-  const { profile } = useAuth()
   const [quotations, setQuotations] = useState([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('pending')
   const [printSaleId, setPrintSaleId] = useState(null)
 
-  const fetchQuotations = async () => {
-    let query = supabase
-      .from('sales')
-      .select('*, customers(name, phone)')
-      .eq('type', 'quotation')
-      .order('created_at', { ascending: false })
-    if (filter !== 'all') query = query.eq('status', filter)
-    const { data } = await query
+  const fetchQuotations = useCallback(async () => {
+    const doFetch = async () => {
+      // Expire overdue pending quotations server-side (owner-authoritative);
+      // members no longer write to sales directly.
+      await supabase.rpc('expire_quotations')
 
-    const today = new Date().toISOString().slice(0, 10)
-    const expired = data?.filter(q => q.status === 'pending' && q.expiry_date && q.expiry_date < today) || []
-    if (expired.length > 0) {
-      await supabase.from('sales').update({ status: 'expired' }).in('id', expired.map(q => q.id))
-      fetchQuotations()
-      return
+      let query = supabase
+        .from('sales')
+        .select('*, customers(name, phone)')
+        .eq('type', 'quotation')
+        .order('created_at', { ascending: false })
+      if (filter !== 'all') query = query.eq('status', filter)
+      const { data } = await query
+
+      setQuotations(data || [])
+      setLoading(false)
     }
+    await doFetch()
+  }, [filter])
 
-    setQuotations(data || [])
-    setLoading(false)
-  }
-
-  useEffect(() => { fetchQuotations() }, [filter])
+  useEffect(() => { fetchQuotations() }, [filter, fetchQuotations])
   useEffect(() => {
     const handler = () => fetchQuotations()
     window.addEventListener('syncCompleted', handler)
     return () => window.removeEventListener('syncCompleted', handler)
-  }, [])
+  }, [fetchQuotations])
   useRealtimeSubscription('sales', (payload) => {
     const sale = payload.new || payload.old
     if (sale && sale.type === 'quotation') fetchQuotations()
