@@ -18,7 +18,8 @@ export default function TenantSelector() {
         <div className="text-center mb-8">
           <BrandMark className="h-14 w-14 mx-auto" />
           <h1 className="text-2xl font-bold text-heading mt-3">SalesHub POS</h1>
-          <p className="text-text mt-1">Choose which shop to open</p>
+          <p className="text-text mt-1 font-medium">Your sales, one hub. Run your shop from one hub</p>
+          <p className="text-text/70 text-xs mt-1">Choose which shop to open</p>
         </div>
 
         {tenants.length === 0 ? (

@@ -46,7 +46,8 @@ export default function Login() {
         <div className="text-center">
           <BrandMark className="h-14 w-14 mx-auto" />
           <h1 className="text-2xl font-bold text-heading mt-3">SalesHub POS</h1>
-          <p className="text-text mt-1">Sign in to your account</p>
+          <p className="text-text mt-1 font-medium">Your sales, one hub. Run your shop from one hub</p>
+          <p className="text-text/70 text-xs mt-1">Sign in to your account</p>
         </div>
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3">
