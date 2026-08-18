@@ -6,7 +6,8 @@ import { Navigate, Link } from 'react-router-dom'
 const BUSINESS_TYPES = [
   { value: 'hardware', label: 'Hardware shop' },
   { value: 'phones', label: 'Phone shop' },
-  { value: 'general', label: 'General store' }
+  { value: 'general', label: 'General store' },
+  { value: 'supermarket', label: 'Supermarket' }
 ]
 
 const PLANS = [

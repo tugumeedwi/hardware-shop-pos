@@ -64,12 +64,14 @@ export default function POS() {
         toast.error('Phone with IMEI not found')
       }
     } else {
-      const product = products.find(p => p.sku === text)
+      // Supermarket scanning: match the EAN/UPC barcode first, then fall back
+      // to a plain SKU match so legacy catalogue data keeps working.
+      const product = products.find(p => p.barcode === text) || products.find(p => p.sku === text)
       if (product) {
         addToCart(product)
         toast.success(`Added ${product.name}`)
       } else {
-        toast.error(`No product with SKU ${text}`)
+        toast.error(`No product with barcode/SKU ${text}`)
       }
     }
     setScannerActive(false)
@@ -275,7 +277,8 @@ export default function POS() {
 
   const filteredProducts = products.filter(p =>
     p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (p.sku && p.sku.toLowerCase().includes(searchTerm.toLowerCase()))
+    (p.sku && p.sku.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (p.barcode && p.barcode.toLowerCase().includes(searchTerm.toLowerCase()))
   )
 
   // ---- Cart handlers ----
@@ -318,7 +321,11 @@ export default function POS() {
   const removeFromCart = (index) => setCart(cart.filter((_, i) => i !== index))
 
   const totalBeforeDiscount = cart.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0)
-  const totalAfterDiscount = totalBeforeDiscount - parseFloat(discount || 0)
+  const taxAmount = cart.reduce(
+    (sum, item) => sum + (item.quantity * item.unitPrice * ((parseFloat(item.product.tax_rate)) || 0) / 100),
+    0
+  )
+  const totalAfterDiscount = totalBeforeDiscount - parseFloat(discount || 0) + taxAmount
 
   // ---- Customer lookup ----
   const lookupCustomer = async () => {
@@ -619,6 +626,13 @@ export default function POS() {
                 className="group relative bg-card border border-border rounded-xl p-4 text-left shadow-sm hover:shadow-md hover:scale-[1.02] active:scale-100 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary"
               >
                 <div className="font-semibold text-heading text-sm leading-tight">{product.name}</div>
+                {product.barcode && (
+                  <div className="mt-1 flex items-center gap-1">
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-surface text-text truncate max-w-full">
+                      {product.barcode}
+                    </span>
+                  </div>
+                )}
                 {product.attributes?.imei && (
                   <div className="mt-1 flex items-center gap-1">
                     <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-surface text-text truncate max-w-full">
@@ -684,11 +698,12 @@ export default function POS() {
                       )}
                       <input
                         type="number"
-                        min="1"
+                        min="0.01"
+                        step={item.sellingUnit === 'kg' ? '0.01' : '1'}
                         value={item.quantity}
                         onChange={(e) => {
                           let val = parseFloat(e.target.value)
-                          if (isNaN(val) || val < 1) val = 1
+                          if (isNaN(val) || val <= 0) val = 1
                           updateCartItem(index, 'quantity', val)
                         }}
                         className="w-14 text-xs border border-border-dark rounded-lg px-2 py-1 bg-card focus:outline-none focus:ring-1 focus:ring-primary"
@@ -725,6 +740,12 @@ export default function POS() {
                   className="w-20 border border-border-dark rounded-lg px-2 py-1 text-sm bg-card focus:outline-none focus:ring-1 focus:ring-primary"
                 />
               </div>
+              {taxAmount > 0 && (
+                <div className="flex justify-between text-text">
+                  <span>Tax</span>
+                  <span>{taxAmount.toFixed(2)}</span>
+                </div>
+              )}
               <div className="flex justify-between text-heading font-bold text-lg border-t border-border pt-2">
                 <span>Net Total</span>
                 <span>{totalAfterDiscount.toFixed(2)}</span>

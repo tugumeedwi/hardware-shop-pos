@@ -55,4 +55,24 @@ db.version(5).stores({
   memberships: 'tenant_id, role'
 });
 
+db.version(6).stores({
+  // barcode added so supermarket EAN/UPC lookups work from the offline mirror.
+  products: 'id, name, sku, barcode, category, is_tile, stock_quantity, price_per_piece, price_per_box, price_per_sqm, price_per_kg, active_pricing_methods, pieces_per_box, m2_per_piece, pieces_per_kg, attributes, is_deleted',
+  customers: 'id, name, phone',
+  pendingSales: '++localId, saleData.offline_created_at, status',
+  syncQueue: '++id, tableName, recordId, operation, timestamp, attempts, nextRetryAt',
+  memberships: 'tenant_id, role'
+});
+
+db.version(7).stores({
+  // tax_rate indexed so offline POS/quote totals can compute VAT while the
+  // cashier is offline; brand/supplier carried so supermarket products sync
+  // faithfully through the mirror.
+  products: 'id, name, sku, barcode, category, is_tile, stock_quantity, price_per_piece, price_per_box, price_per_sqm, price_per_kg, active_pricing_methods, pieces_per_box, m2_per_piece, pieces_per_kg, attributes, is_deleted, tax_rate, brand, supplier',
+  customers: 'id, name, phone',
+  pendingSales: '++localId, saleData.offline_created_at, status',
+  syncQueue: '++id, tableName, recordId, operation, timestamp, attempts, nextRetryAt',
+  memberships: 'tenant_id, role'
+});
+
 export default db;

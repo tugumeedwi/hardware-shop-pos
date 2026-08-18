@@ -61,7 +61,7 @@ function waitForQZ() {
 
 // Build ESC/POS receipt commands with sanitized inputs
 function buildReceiptCommands({
-  title, items, subtotal, discount, total,
+  title, items, subtotal, discount, tax, total,
   paymentMethod, amountPaid, customerName,
   date, saleId, isQuote
 }, settings = {}) {
@@ -104,6 +104,9 @@ function buildReceiptCommands({
   commands.push(`Subtotal: ${subtotal.toFixed(2)}\n`)
   if (discount > 0) {
     commands.push(`Discount: -${discount.toFixed(2)}\n`)
+  }
+  if (settings.showTax && (tax || 0) > 0) {
+    commands.push(`Tax: ${tax.toFixed(2)}\n`)
   }
   commands.push(`\x1B\x45\x01`)     // ESC E 1 - Bold on
   commands.push(`TOTAL: ${total.toFixed(2)}\n`)

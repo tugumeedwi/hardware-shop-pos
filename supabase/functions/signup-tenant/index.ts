@@ -9,7 +9,7 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS'
 }
 
-const ALLOWED_BUSINESS_TYPES = ['hardware', 'phones', 'general']
+const ALLOWED_BUSINESS_TYPES = ['hardware', 'phones', 'general', 'supermarket']
 const ALLOWED_PLANS = ['starter', 'pro']
 
 function clientIp(req) {

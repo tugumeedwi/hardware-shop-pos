@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import Papa from 'papaparse'
 import { supabase } from '../api/supabaseClient'
 import toast from 'react-hot-toast'
 import { useRealtimeSubscription } from '../hooks/useRealtime'
@@ -12,10 +13,19 @@ const PHONE_ATTR_FIELDS = [
   { key: 'condition', label: 'Condition' }
 ]
 
-const baseForm = (isHardware) => ({
+const SUPERMARKET_CATEGORIES = [
+  'Groceries', 'Dairy', 'Beverages', 'Meat', 'Produce', 'Bakery',
+  'Household', 'Personal Care', 'Other'
+]
+
+const baseForm = (isHardware, isSupermarket) => ({
   name: '',
   category: '',
   sku: '',
+  barcode: '',
+  brand: '',
+  supplier: '',
+  tax_rate: 0,
   is_tile: false,
   stock_quantity: 0,
   low_stock_threshold: 10,
@@ -26,7 +36,9 @@ const baseForm = (isHardware) => ({
   price_per_box: '',
   price_per_sqm: '',
   price_per_kg: '',
-  active_methods: { piece: true, box: isHardware && false, sqm: false, kg: false },
+  active_methods: isSupermarket
+    ? { piece: true, box: false, sqm: false, kg: false }
+    : { piece: true, box: isHardware && false, sqm: false, kg: false },
   attributes: {},
   customAttributes: []
 })
@@ -48,12 +60,14 @@ export default function Products() {
   const isHardware = businessType === 'hardware'
   const isPhone = businessType === 'phones'
   const isGeneral = businessType === 'general'
+  const isSupermarket = businessType === 'supermarket'
   const isPieceOnly = isPhone || isGeneral
 
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(null)
-  const [form, setForm] = useState(() => baseForm(isHardware))
+  const [form, setForm] = useState(() => baseForm(isHardware, isSupermarket))
+  const [importing, setImporting] = useState(false)
 
   const fetchProducts = async () => {
     const { data } = await supabase.from('products').select('*').eq('is_deleted', false).order('name')
@@ -74,7 +88,7 @@ export default function Products() {
 
   const resetForm = () => {
     setEditing(null)
-    setForm(baseForm(isHardware))
+    setForm(baseForm(isHardware, isSupermarket))
   }
 
   const editProduct = (product) => {
@@ -84,6 +98,10 @@ export default function Products() {
       name: product.name,
       category: product.category || '',
       sku: product.sku || '',
+      barcode: product.barcode || '',
+      brand: product.brand || '',
+      supplier: product.supplier || '',
+      tax_rate: product.tax_rate || 0,
       is_tile: product.is_tile,
       stock_quantity: product.stock_quantity,
       low_stock_threshold: product.low_stock_threshold || 10,
@@ -149,7 +167,7 @@ export default function Products() {
           .filter(([, v]) => v !== '')
       )
     }
-    if (isGeneral) {
+    if (isGeneral || isSupermarket) {
       return Object.fromEntries(
         form.customAttributes
           .filter(a => a.key && a.key.trim())
@@ -167,15 +185,19 @@ export default function Products() {
       name: form.name.trim(),
       category: form.category || null,
       sku: form.sku || null,
+      barcode: form.barcode ? String(form.barcode).trim() : null,
+      brand: form.brand ? String(form.brand).trim() : null,
+      supplier: form.supplier ? String(form.supplier).trim() : null,
+      tax_rate: parseFloat(form.tax_rate) || 0,
       is_tile: isPieceOnly ? false : form.is_tile,
       stock_quantity: form.stock_quantity,
       low_stock_threshold: form.low_stock_threshold,
-      pieces_per_box: !isPieceOnly && form.is_tile && form.active_methods.box ? Number(form.pieces_per_box) : null,
-      m2_per_piece: !isPieceOnly && form.is_tile && form.active_methods.sqm ? Number(form.m2_per_piece) : null,
+      pieces_per_box: isSupermarket ? null : (!isPieceOnly && form.is_tile && form.active_methods.box ? Number(form.pieces_per_box) : null),
+      m2_per_piece: isSupermarket ? null : (!isPieceOnly && form.is_tile && form.active_methods.sqm ? Number(form.m2_per_piece) : null),
       pieces_per_kg: !isPieceOnly && form.active_methods.kg ? Number(form.pieces_per_kg) : null,
       price_per_piece: Number(form.price_per_piece),
-      price_per_box: !isPieceOnly && form.active_methods.box ? Number(form.price_per_box) : null,
-      price_per_sqm: !isPieceOnly && form.active_methods.sqm ? Number(form.price_per_sqm) : null,
+      price_per_box: isSupermarket ? null : (!isPieceOnly && form.active_methods.box ? Number(form.price_per_box) : null),
+      price_per_sqm: isSupermarket ? null : (!isPieceOnly && form.active_methods.sqm ? Number(form.price_per_sqm) : null),
       price_per_kg: !isPieceOnly && form.active_methods.kg ? Number(form.price_per_kg) : null,
       active_pricing_methods: isPieceOnly ? ['piece'] : getActiveMethods(),
       attributes: attrsKeyCount ? attributes : null
@@ -193,13 +215,13 @@ export default function Products() {
 
     if (getActiveMethods().length === 0) { toast.error('At least one pricing method must be active'); return false }
     if (form.active_methods.piece && parseFloat(form.price_per_piece) <= 0) { toast.error('Price per piece must be positive'); return false }
-    if (form.active_methods.box && parseFloat(form.price_per_box) <= 0) { toast.error('Price per box must be positive'); return false }
-    if (form.active_methods.sqm && parseFloat(form.price_per_sqm) <= 0) { toast.error('Price per sqm must be positive'); return false }
+    if (!isSupermarket && form.active_methods.box && parseFloat(form.price_per_box) <= 0) { toast.error('Price per box must be positive'); return false }
+    if (!isSupermarket && form.active_methods.sqm && parseFloat(form.price_per_sqm) <= 0) { toast.error('Price per sqm must be positive'); return false }
     if (form.active_methods.kg && parseFloat(form.price_per_kg) <= 0) { toast.error('Price per kg must be positive'); return false }
-    if (form.is_tile && form.active_methods.box && (!form.pieces_per_box || Number(form.pieces_per_box) <= 0)) {
+    if (!isSupermarket && form.is_tile && form.active_methods.box && (!form.pieces_per_box || Number(form.pieces_per_box) <= 0)) {
       toast.error('Pieces per box is required when box pricing is enabled'); return false
     }
-    if (form.is_tile && form.active_methods.sqm && (!form.m2_per_piece || Number(form.m2_per_piece) <= 0)) {
+    if (!isSupermarket && form.is_tile && form.active_methods.sqm && (!form.m2_per_piece || Number(form.m2_per_piece) <= 0)) {
       toast.error('m² per piece is required when sqm pricing is enabled'); return false
     }
     if (form.active_methods.kg && (!form.pieces_per_kg || Number(form.pieces_per_kg) <= 0)) {
@@ -247,9 +269,73 @@ export default function Products() {
     }
   }
 
+  const handleCsvImport = async (e) => {
+    const file = e.target.files?.[0]
+    e.target.value = '' // allow re-selecting the same file
+    if (!file) return
+    setImporting(true)
+    try {
+      const parsed = Papa.parse(await file.text(), {
+        header: true,
+        skipEmptyLines: true,
+        transformHeader: h => h.trim().toLowerCase()
+      })
+      if (parsed.errors.some(err => err.type === 'Delimiter' || err.type === 'MissingQuotes')) {
+        throw new Error('Could not parse CSV – check quoting')
+      }
+      const rows = parsed.data
+      if (rows.length === 0) throw new Error('CSV must have a header row plus data rows')
+      const now = new Date().toISOString()
+
+      const payloads = rows.map(row => {
+        const name = (row.name || '').trim()
+        const barcode = (row.barcode || '').trim()
+        const price = parseFloat(row.price)
+        const stock = parseFloat(row.stock)
+        const category = (row.category || '').trim()
+        const unit = (row.unit || 'piece').toLowerCase()
+        const piecePrice = unit === 'kg' ? 0 : (isNaN(price) ? 0 : price)
+        const kgPrice = unit === 'kg' ? (isNaN(price) ? 0 : price) : 0
+        return {
+          name,
+          barcode: barcode || null,
+          sku: barcode || null,
+          category: category || null,
+          stock_quantity: isNaN(stock) ? 0 : stock,
+          low_stock_threshold: 10,
+          price_per_piece: piecePrice,
+          price_per_kg: kgPrice,
+          pieces_per_kg: unit === 'kg' ? 1 : null,
+          active_pricing_methods: unit === 'kg' ? ['kg'] : ['piece'],
+          is_deleted: false,
+          created_at: now,
+          updated_at: now
+        }
+      }).filter(p => p.name)
+
+      if (payloads.length === 0) throw new Error('No valid rows found (name column required)')
+
+      const BATCH = 500
+      let inserted = 0
+      for (let i = 0; i < payloads.length; i += BATCH) {
+        const { error } = await supabase.from('products').insert(payloads.slice(i, i + BATCH))
+        if (error) throw error
+        inserted += Math.min(BATCH, payloads.length - i)
+      }
+      toast.success(`Imported ${inserted} products`)
+      fetchProducts()
+    } catch (err) {
+      console.error('CSV import error:', err)
+      toast.error(`Import failed: ${err.message}`)
+    } finally {
+      setImporting(false)
+    }
+  }
+
   const productTypeLabel = (product) => {
     if (product.attributes && (product.attributes.imei || product.attributes.color || product.attributes.storage || product.attributes.condition)) return 'Phone'
     if (product.is_tile) return 'Tile'
+    if (isSupermarket) return 'Retail'
     return businessType === 'general' ? 'General' : 'Hardware'
   }
 
@@ -259,10 +345,25 @@ export default function Products() {
     <div className="min-h-screen bg-background p-4 font-sans">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-heading">Product Management</h1>
-        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-primary-soft text-primary-hover border border-primary-light">
-          {businessType}
-        </span>
+        <div className="flex items-center gap-3">
+          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-primary-soft text-primary-hover border border-primary-light">
+            {businessType}
+          </span>
+          <label className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-colors cursor-pointer ${importing ? 'bg-border text-text-muted' : 'bg-ink text-white hover:bg-ink-hover'}`}>
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
+            </svg>
+            {importing ? 'Importing…' : 'Import CSV'}
+            <input type="file" accept=".csv,text/csv" onChange={handleCsvImport} className="hidden" disabled={importing} />
+          </label>
+        </div>
       </div>
+
+      {isSupermarket && (
+        <p className="text-xs text-text mb-4">
+          CSV format: <code className="bg-surface px-1.5 py-0.5 rounded">name,barcode,price,stock,category,unit</code> (unit = piece or kg).
+        </p>
+      )}
 
       {/* Form card */}
       <form onSubmit={handleSave} className="bg-card border border-border rounded-2xl shadow-sm p-6 mb-8 max-w-3xl">
@@ -271,20 +372,81 @@ export default function Products() {
           <Field label="Product Name" required>
             <input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputClass + ' w-full'} required />
           </Field>
-          <Field label="Category">
-            <input type="text" placeholder="e.g. Cement, Sanitary, Accessories" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className={inputClass + ' w-full'} />
-          </Field>
-          <Field label={isPhone ? 'SKU (optional)' : 'SKU / Barcode'}>
-            <input type="text" placeholder={isPhone ? 'Internal code for this phone' : 'Scannable barcode / SKU'} value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} className={inputClass + ' w-full'} />
-          </Field>
-          {isHardware ? (
+          {isSupermarket ? (
+            <Field label="Category">
+              <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className={inputClass + ' w-full'}>
+                <option value="">Select category…</option>
+                {SUPERMARKET_CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+              </select>
+            </Field>
+          ) : (
+            <Field label="Category">
+              <input type="text" placeholder="e.g. Cement, Sanitary, Accessories" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className={inputClass + ' w-full'} />
+            </Field>
+          )}
+          {isSupermarket && (
+            <>
+              <Field label="Barcode (EAN/UPC)">
+                <input type="text" placeholder="e.g. 8901030726417" value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} className={inputClass + ' w-full'} />
+              </Field>
+              <Field label="SKU (optional)">
+                <input type="text" placeholder="Internal code" value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} className={inputClass + ' w-full'} />
+              </Field>
+              <Field label="Brand">
+                <input type="text" placeholder="e.g. Britannia, Sasco" value={form.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })} className={inputClass + ' w-full'} />
+              </Field>
+              <Field label="Supplier">
+                <input type="text" placeholder="e.g. Metro Distributors" value={form.supplier} onChange={(e) => setForm({ ...form, supplier: e.target.value })} className={inputClass + ' w-full'} />
+              </Field>
+              <Field label="Tax Rate (%)">
+                <input type="number" step="0.01" min="0" value={form.tax_rate} onChange={(e) => setForm({ ...form, tax_rate: e.target.value })} className={inputClass + ' w-full'} />
+              </Field>
+            </>
+          )}
+          {!isSupermarket && (
+            <Field label={isPhone ? 'SKU (optional)' : 'SKU / Barcode'}>
+              <input type="text" placeholder={isPhone ? 'Internal code for this phone' : 'Scannable barcode / SKU'} value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} className={inputClass + ' w-full'} />
+            </Field>
+          )}
+        {isSupermarket ? (
+          <>
+            <div className="mt-4 font-medium text-text-strong">Active Pricing Methods</div>
+            <div className="flex flex-wrap gap-4 mt-2">
+              {['piece', 'kg'].map(unit => (
+                <label key={unit} className="flex items-center gap-1.5 text-sm text-text">
+                  <input type="checkbox" checked={form.active_methods[unit]} onChange={(e) => setForm({ ...form, active_methods: { ...form.active_methods, [unit]: e.target.checked } })} className="rounded border-border-dark text-primary focus:ring-primary" />
+                  {unit}
+                </label>
+              ))}
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+              {form.active_methods.piece && (
+                <Field label="Price per Piece (UGX)">
+                  <input type="number" step="0.01" min="0" value={form.price_per_piece} onChange={(e) => setForm({ ...form, price_per_piece: e.target.value })} className={inputClass + ' w-full'} />
+                </Field>
+              )}
+              {form.active_methods.kg && (
+                <Field label="Price per Kg (UGX)">
+                  <input type="number" step="0.01" min="0" value={form.price_per_kg} onChange={(e) => setForm({ ...form, price_per_kg: e.target.value })} className={inputClass + ' w-full'} />
+                </Field>
+              )}
+            </div>
+            {form.active_methods.kg && (
+              <div className="grid grid-cols-1 md:grid-cols-1 gap-4 mt-4">
+                <Field label="Pieces per Kg (for stock conversion)" required>
+                  <input type="number" step="any" min="0" value={form.pieces_per_kg} onChange={(e) => setForm({ ...form, pieces_per_kg: e.target.value })} className={inputClass + ' w-full'} />
+                </Field>
+              </div>
+            )}
+          </>
+        ) : isHardware ? (
             <label className="flex items-center gap-2 text-text-strong self-end pb-2.5">
               <input type="checkbox" checked={form.is_tile} onChange={(e) => setForm({ ...form, is_tile: e.target.checked })} className="rounded border-border-dark text-primary focus:ring-primary" />
               Tile product?
             </label>
           ) : (
             <div className="flex items-center text-sm text-text self-end pb-2.5">
-              {isPhone ? 'Phone product (sold by piece)' : 'General product (sold by piece)'}
+              {isPhone ? 'Phone product (sold by piece)' : isSupermarket ? 'Supermarket item (piece or kg)' : 'General product (sold by piece)'}
             </div>
           )}
           <Field label="Stock Quantity (pieces)" required>
@@ -311,7 +473,7 @@ export default function Products() {
           </div>
         )}
 
-        {isGeneral && (
+        {(isGeneral || isSupermarket) && (
           <div className="mt-4">
             <div className="font-medium text-text-strong mb-2">Custom attributes</div>
             <div className="space-y-2">
@@ -440,7 +602,7 @@ export default function Products() {
               <tr>
                 <th className="px-4 py-3 text-left font-medium text-text">Name</th>
                 <th className="px-4 py-3 text-left font-medium text-text">Category</th>
-                <th className="px-4 py-3 text-left font-medium text-text">SKU</th>
+                <th className="px-4 py-3 text-left font-medium text-text">{isSupermarket ? 'Barcode' : 'SKU'}</th>
                 <th className="px-4 py-3 text-center font-medium text-text">Stock</th>
                 <th className="px-4 py-3 text-center font-medium text-text">Type</th>
                 <th className="px-4 py-3 text-center font-medium text-text">Methods</th>
@@ -457,7 +619,7 @@ export default function Products() {
                     )}
                   </td>
                   <td className="px-4 py-3 text-text">{product.category || '-'}</td>
-                  <td className="px-4 py-3 text-text">{product.sku || '-'}</td>
+                  <td className="px-4 py-3 text-text">{isSupermarket ? (product.barcode || '-') : (product.sku || '-')}</td>
                   <td className="px-4 py-3 text-center">
                     <span className="inline-flex items-center gap-1">
                       {product.stock_quantity}

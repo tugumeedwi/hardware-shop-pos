@@ -37,7 +37,7 @@ export default function Receipt({ saleId, onClose }) {
     // Fetch sale items with product names
     const { data: itemsData } = await supabase
       .from('sale_items')
-      .select('*, products(name)')
+      .select('*, products(name, tax_rate)')
       .eq('sale_id', saleId)
 
     setSale(saleData)
@@ -58,8 +58,9 @@ const handleThermalPrint = () => {
       unit_price: it.unit_price,
       line_total: it.line_total
     })),
-    subtotal: sale.total_amount + sale.discount_total,
+    subtotal: sale.total_amount + sale.discount_total - taxAmount,
     discount: sale.discount_total,
+    tax: taxAmount,
     total: sale.total_amount,
     paymentMethod: sale.payment_method,
     amountPaid: sale.amount_paid,
@@ -107,6 +108,13 @@ const handleThermalPrint = () => {
   const isQuote = sale.type === 'quotation'
   const title = isQuote ? 'QUOTATION' : 'RECEIPT'
   const isThermal = receipt.template === 'thermal'
+  // Tax is itemised per product (tax_rate on the product row). The stored
+  // sale total is tax-inclusive (create_sale computes Σ line_total * rate/100
+  // and adds it), so the receipt reconstructs subtotal by backing tax out.
+  const taxAmount = items.reduce((sum, it) => {
+    const rate = parseFloat(it.products?.tax_rate) || 0
+    return sum + (it.line_total || 0) * (rate / 100)
+  }, 0)
 
   return (
     <div className={`receipt-container bg-card max-w-3xl mx-auto p-6 print:shadow-none print:p-0 ${isThermal ? 'max-w-sm font-mono' : ''}`}>
@@ -191,16 +199,16 @@ const handleThermalPrint = () => {
           <div className="w-48">
             <div className="flex justify-between py-1">
               <span>Subtotal:</span>
-              <span>{(sale.total_amount + sale.discount_total).toFixed(2)}</span>
+              <span>{(sale.total_amount + sale.discount_total - taxAmount).toFixed(2)}</span>
             </div>
             <div className="flex justify-between py-1">
               <span>Discount:</span>
               <span>-{sale.discount_total.toFixed(2)}</span>
             </div>
-            {receipt.showTax && sale.tax_amount > 0 && (
+            {receipt.showTax && taxAmount > 0 && (
               <div className="flex justify-between py-1">
-                <span>Tax:</span>
-                <span>{sale.tax_amount.toFixed(2)}</span>
+                <span>VAT:</span>
+                <span>{taxAmount.toFixed(2)}</span>
               </div>
             )}
             <div

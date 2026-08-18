@@ -75,7 +75,11 @@ export default function QuotationForm() {
 
   const removeFromCart = (index) => setCart(cart.filter((_, i) => i !== index))
   const totalBeforeDiscount = cart.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0)
-  const totalAfterDiscount = totalBeforeDiscount - parseFloat(discount || 0)
+  const taxAmount = cart.reduce(
+    (sum, item) => sum + (item.quantity * item.unitPrice * ((parseFloat(item.product.tax_rate)) || 0) / 100),
+    0
+  )
+  const totalAfterDiscount = totalBeforeDiscount - parseFloat(discount || 0) + taxAmount
 
   const lookupCustomer = async () => {
     const phone = normalisePhone(customerPhoneInput)
