@@ -39,7 +39,9 @@ export default function POS() {
   // decodes QR/barcodes in real time. Both funnel into handleScannedText().
   const [scannerActive, setScannerActive] = useState(false)
   const [cameraOpen, setCameraOpen] = useState(false)
-  const scannerRef = useRef(null)
+  // Starts as an empty string, not null: `ref.current += e.key` on the very
+  // first scan would otherwise prepend "null" and break the barcode/IMEI match.
+  const scannerRef = useRef('')
   const cameraRegionRef = useRef(null)
   const lowStockCount = products.filter(p => p.stock_quantity <= (p.low_stock_threshold || 10)).length
 

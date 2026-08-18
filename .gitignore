@@ -27,3 +27,8 @@ dist-ssr
 # Supabase CLI local metadata
 supabase/.temp/
 supabase/.branches/
+
+# Playwright test artifacts
+test-data.json
+playwright-report/
+test-results/
