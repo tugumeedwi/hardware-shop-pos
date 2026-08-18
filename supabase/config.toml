@@ -30,3 +30,21 @@
     verify_jwt = true
   [functions.list-pending-payment-requests]
     verify_jwt = true
+
+[auth]
+site_url = "https://saleshub-pos.netlify.app"
+additional_redirect_urls = ["https://saleshub-pos.netlify.app"]
+
+[auth.email]
+enable_signup = true
+enable_confirmations = true
+double_confirm_changes = false
+
+[auth.email.smtp]
+enabled = true
+host = "smtp-relay.brevo.com"
+port = 587
+user = "b5e0cb001@smtp-brevo.com"
+pass = "env(BREVO_SMTP_PASSWORD)"
+admin_email = "tugumeedwi@gmail.com"
+sender_name = "SalesHub POS"

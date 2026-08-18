@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../api/supabaseClient'
 import { useNavigate, Link } from 'react-router-dom'
 import { useSyncStatus } from '../hooks/useSyncStatus'
 import { useSessionTimeout } from '../hooks/useSessionTimeout'
+import { useOnlineStatus } from '../hooks/useOnlineStatus'
 import { processSyncQueue } from '../utils/syncManager'
 import { Toaster } from 'react-hot-toast'
 import Sidebar from './Sidebar'
@@ -15,19 +16,8 @@ export default function Layout({ children }) {
   const navigate = useNavigate()
   const { pendingCount } = useSyncStatus()
   const { showWarning, resetTimer } = useSessionTimeout()
+  const { isOnline: online } = useOnlineStatus()
   const [mobileOpen, setMobileOpen] = useState(false)
-  const [online, setOnline] = useState(() => navigator.onLine)
-
-  useEffect(() => {
-    const goOnline = () => setOnline(true)
-    const goOffline = () => setOnline(false)
-    window.addEventListener('online', goOnline)
-    window.addEventListener('offline', goOffline)
-    return () => {
-      window.removeEventListener('online', goOnline)
-      window.removeEventListener('offline', goOffline)
-    }
-  }, [])
 
   const BAD_SUBSCRIPTION_STATUSES = ['inactive', 'past_due', 'unpaid', 'cancelled', 'expired']
   const HARD_BLOCKED_STATUSES = ['past_due', 'unpaid', 'cancelled', 'expired']
@@ -41,7 +31,7 @@ export default function Layout({ children }) {
   const handleLogout = async () => {
     // Best-effort flush of pending offline sales before the session dies;
     // the offline DB itself is preserved (it belongs to the shop).
-    if (navigator.onLine) {
+    if (online) {
       try { await processSyncQueue() } catch { /* ignore */ }
     }
     await supabase.auth.signOut()

@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../api/supabaseClient'
 import { useAuth } from '../context/AuthContext'
+import { useOnlineStatus } from '../hooks/useOnlineStatus'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { normalisePhone } from '../utils/phoneUtils'
@@ -8,6 +9,7 @@ import db from '../db/localDatabase'
 
 export default function QuotationForm() {
   const { profile } = useAuth()
+  const { isOnline } = useOnlineStatus()
   const navigate = useNavigate()
   const [products, setProducts] = useState([])
   const [cart, setCart] = useState([])
@@ -15,25 +17,31 @@ export default function QuotationForm() {
   const [selectedCustomer, setSelectedCustomer] = useState(null)
   const [customerPhoneInput, setCustomerPhoneInput] = useState('')
   const [customerLookupError, setCustomerLookupError] = useState('')
+  const [showQuickAddCustomer, setShowQuickAddCustomer] = useState(false)
+  const [newCustomerName, setNewCustomerName] = useState('')
   const [discount, setDiscount] = useState(0)
   const [expiryDate, setExpiryDate] = useState('')
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
 
-  async function loadProducts() {
-    if (navigator.onLine) {
-      const { data } = await supabase.from('products').select('*').eq('is_deleted', false)
-      if (data) setProducts(data)
+  const loadProducts = useCallback(async () => {
+    if (isOnline) {
+      const { data, error } = await supabase.from('products').select('*').eq('is_deleted', false)
+      if (!error && data) setProducts(data)
+      else {
+        const local = await db.products.toArray()
+        setProducts(local)
+      }
     } else {
       const local = await db.products.toArray()
       setProducts(local)
     }
-  }
+  }, [isOnline])
 
   useEffect(() => {
     const t = setTimeout(loadProducts, 0)
     return () => clearTimeout(t)
-  }, [])
+  }, [loadProducts])
 
   const filteredProducts = products.filter(p =>
     p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -72,13 +80,44 @@ export default function QuotationForm() {
   const lookupCustomer = async () => {
     const phone = normalisePhone(customerPhoneInput)
     if (!phone) { setSelectedCustomer(null); return }
-    const { data } = await supabase.from('customers').select('*').eq('phone', phone)
+    const { data, error } = await supabase.from('customers').select('*').eq('phone', phone)
+    if (error) {
+      console.error('Customer lookup error:', error)
+      setSelectedCustomer(null)
+      setCustomerLookupError('Failed to look up customer')
+      return
+    }
     if (data && data.length > 0) {
       setSelectedCustomer(data[0])
       setCustomerLookupError('')
     } else {
       setSelectedCustomer(null)
       setCustomerLookupError('No customer found')
+    }
+  }
+
+  const quickAddCustomer = async () => {
+    if (!newCustomerName.trim()) return toast.error('Enter customer name')
+    const phone = normalisePhone(customerPhoneInput)
+    const payload = {
+      name: newCustomerName.trim(),
+      phone,
+      credit_limit: 0,
+      current_credit_balance: 0
+    }
+    if (isOnline) {
+      const { data, error } = await supabase.from('customers').insert(payload).select('*').single()
+      if (error) {
+        console.error('Create customer error:', error)
+        return toast.error('Failed to create customer')
+      }
+      setSelectedCustomer(data)
+      setCustomerLookupError('')
+      setShowQuickAddCustomer(false)
+      setNewCustomerName('')
+      await db.customers.put(data)
+    } else {
+      toast.error('Cannot create customer while offline')
     }
   }
 
@@ -102,7 +141,7 @@ export default function QuotationForm() {
       notes: notes || null,
       expiry_date: expiryDate || null,
       offline_created_at: new Date().toISOString(),
-      sync_status: navigator.onLine ? 'synced' : 'pending',
+      sync_status: isOnline ? 'synced' : 'pending',
       items: cart.map(item => ({
         product_id: item.product.id,
         selling_unit: item.sellingUnit,
@@ -113,7 +152,7 @@ export default function QuotationForm() {
       }))
     }
 
-    if (navigator.onLine) {
+    if (isOnline) {
       // Server-side creation is atomic (sale + items + stock check in one RPC)
       // and idempotency-keyed, so a retry can never double-save.
       const { error } = await supabase.rpc('create_sale', { sale_data: payload })
@@ -204,12 +243,29 @@ export default function QuotationForm() {
             <div className="space-y-2">
               <label className="text-sm font-medium text-text">Customer Phone</label>
               <div className="flex gap-2">
-                <input type="text" placeholder="07XX..." value={customerPhoneInput} onChange={(e) => setCustomerPhoneInput(e.target.value)}
+                <input type="text" placeholder="07XX..." value={customerPhoneInput} onChange={(e) => { setCustomerPhoneInput(e.target.value); setCustomerLookupError('') }}
                   className="flex-1 border border-border-dark rounded-lg px-3 py-2 bg-card focus:outline-none focus:ring-1 focus:ring-primary" />
                 <button onClick={lookupCustomer} className="bg-ink text-white px-3 py-2 rounded-lg text-sm hover:bg-ink-hover">Lookup</button>
               </div>
               {customerLookupError && <p className="text-xs text-red-500">{customerLookupError}</p>}
               {selectedCustomer && <div className="bg-primary-soft border border-primary-light rounded-xl p-2 text-sm font-medium text-primary-hover">{selectedCustomer.name}</div>}
+              {customerLookupError && customerLookupError.includes('No customer found') && (
+                <button onClick={() => setShowQuickAddCustomer(!showQuickAddCustomer)} className="text-primary text-xs hover:underline">
+                  + Add new customer
+                </button>
+              )}
+              {showQuickAddCustomer && (
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Customer name"
+                    value={newCustomerName}
+                    onChange={(e) => setNewCustomerName(e.target.value)}
+                    className="flex-1 border border-border-dark rounded-lg px-3 py-2 text-sm bg-card focus:outline-none focus:ring-1 focus:ring-primary"
+                  />
+                  <button onClick={quickAddCustomer} className="bg-primary text-white px-3 py-2 rounded-lg text-sm hover:bg-primary-hover transition-colors">Save</button>
+                </div>
+              )}
             </div>
             <div>
               <label className="text-sm font-medium text-text">Expiry Date</label>

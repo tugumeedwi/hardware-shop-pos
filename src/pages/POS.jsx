@@ -6,6 +6,7 @@ import db from '../db/localDatabase'
 import Receipt from '../components/Receipt'
 import toast from 'react-hot-toast'
 import { useRealtimeSubscription } from '../hooks/useRealtime'
+import { useOnlineStatus } from '../hooks/useOnlineStatus'
 import { normalisePhone } from '../utils/phoneUtils'
 import { queueTaxInvoiceAfterSale } from '../utils/syncManager'
 
@@ -26,7 +27,8 @@ export default function POS() {
   const [paymentMethod, setPaymentMethod] = useState('cash')
   const [discount, setDiscount] = useState(0)
   const [amountPaid, setAmountPaid] = useState('')
-  const [isOffline, setIsOffline] = useState(!navigator.onLine)
+  const { isOnline, checkNow } = useOnlineStatus()
+  const isOffline = !isOnline
   const [showQuickAddCustomer, setShowQuickAddCustomer] = useState(false)
   const [newCustomerName, setNewCustomerName] = useState('')
   const [lastSaleId, setLastSaleId] = useState(null)
@@ -82,8 +84,12 @@ export default function POS() {
 
   // ---- network listeners ----
   const loadProducts = useCallback(async () => {
-    if (navigator.onLine) {
-      const { data } = await supabase.from('products').select('*').eq('is_deleted', false)
+    // Always attempt the live fetch regardless of navigator.onLine – the flag
+    // can be stale (Wi-Fi up but browser thinks it's offline, or vice versa).
+    // On any failure we transparently fall back to the local mirror.
+    try {
+      const { data, error } = await supabase.from('products').select('*').eq('is_deleted', false)
+      if (error) throw error
       if (data && data.length > 0) {
         try {
           await db.products.clear()
@@ -96,24 +102,27 @@ export default function POS() {
         setProducts(data)
         return
       }
+    } catch (e) {
+      console.warn('Product fetch failed, using local cache:', e.message)
     }
     const localProducts = await db.products.toArray()
     setProducts(localProducts)
   }, [])
 
-  const handleOnline = useCallback(() => { setIsOffline(false); loadProducts() }, [loadProducts])
-  const handleOffline = useCallback(() => setIsOffline(true), [])
-
   useEffect(() => {
     const t = setTimeout(loadProducts, 0)
-    window.addEventListener('online', handleOnline)
-    window.addEventListener('offline', handleOffline)
+    const onReconnect = () => {
+      // The network probe confirmed connectivity; pull the live catalog so the
+      // offline state is never left stuck on stale mirrors.
+      loadProducts()
+      checkNow()
+    }
+    window.addEventListener('reconnected', onReconnect)
     return () => {
       clearTimeout(t)
-      window.removeEventListener('online', handleOnline)
-      window.removeEventListener('offline', handleOffline)
+      window.removeEventListener('reconnected', onReconnect)
     }
-  }, [handleOnline, handleOffline, loadProducts])
+  }, [loadProducts, checkNow])
 
   // auto-refresh on sync completion
   useEffect(() => {
@@ -155,6 +164,40 @@ export default function POS() {
 
     const start = async () => {
       try {
+        // Explicitly request camera permission so we can tell the user exactly
+        // what went wrong (denied vs no camera) instead of a generic error.
+        // html5-qrcode would otherwise swallow the getUserMedia rejection.
+        let permissionGranted = false
+        try {
+          if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            throw new Error('getUserMedia not supported')
+          }
+          const probe = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'environment' },
+            audio: false
+          })
+          // Immediately release the probe stream; html5-qrcode will re-acquire
+          // the camera with the now-granted permission.
+          probe.getTracks().forEach((t) => t.stop())
+          permissionGranted = true
+        } catch (permErr) {
+          const name = permErr?.name || ''
+          console.error('Camera permission request failed:', permErr)
+          if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
+            toast.error('Camera permission denied. You can use keyboard scanner instead.')
+          } else if (name === 'NotFoundError' || name === 'DevicesNotFoundError' || name === 'OverconstrainedError') {
+            toast.error('No camera available on this device. Use the keyboard scanner instead.')
+          } else if (name === 'NotReadableError') {
+            toast.error('Camera is in use by another app. Close it and try again.')
+          } else {
+            toast.error('Could not open camera. You can use keyboard scanner instead.')
+          }
+          setCameraOpen(false)
+          return
+        }
+
+        if (!permissionGranted) return
+
         scanner = new Html5Qrcode(cameraRegionId.current)
         await scanner.start(
           { facingMode: 'environment' },
@@ -172,7 +215,12 @@ export default function POS() {
       } catch (err) {
         console.error('Camera start failed:', err)
         setCameraOpen(false)
-        toast.error('Could not open camera. Check permissions.')
+        const name = err?.name || ''
+        if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
+          toast.error('Camera permission denied. You can use keyboard scanner instead.')
+        } else {
+          toast.error('Could not open camera. Check permissions.')
+        }
       }
     }
 
@@ -255,7 +303,7 @@ export default function POS() {
   const lookupCustomer = async () => {
     const phone = normalisePhone(customerPhoneInput)
     if (!phone) { setSelectedCustomer(null); return }
-    if (!navigator.onLine) {
+    if (!isOnline) {
       const localCust = await db.customers.where('phone').equals(phone).first()
       if (localCust) {
         setSelectedCustomer(localCust)
@@ -268,8 +316,17 @@ export default function POS() {
     }
     const { data, error } = await supabase.from('customers').select('*').eq('phone', phone)
     if (error) {
+      // Network blip? Re-probe and fall back to the local cache instead of
+      // bouncing the cashier to a dead error state.
       console.error('Customer lookup error:', error)
-      setCustomerLookupError('Failed to look up customer')
+      checkNow()
+      const localCust = await db.customers.where('phone').equals(phone).first()
+      if (localCust) {
+        setSelectedCustomer(localCust)
+        setCustomerLookupError('')
+      } else {
+        setCustomerLookupError('Failed to look up customer')
+      }
       return
     }
     if (data.length === 0) {
@@ -289,7 +346,7 @@ export default function POS() {
       credit_limit: 0,
       current_credit_balance: 0
     }
-    if (navigator.onLine) {
+    if (isOnline) {
       const { data, error } = await supabase.from('customers').insert(payload).select('*').single()
       if (error) {
         console.error('Create customer error:', error)
@@ -362,10 +419,26 @@ export default function POS() {
 
     let saleCompletedOnline = false
 
-    if (navigator.onLine) {
+    if (isOnline) {
       try {
-        const { data: saleId, error: saleError } = await supabase
+        let { data: saleId, error: saleError } = await supabase
           .rpc('create_sale', { sale_data: saleData })
+
+        // If the request itself failed (network drop, not a business
+        // rejection), re-probe connectivity and retry once before falling
+        // back to the offline queue.
+        if (saleError) {
+          const msg = String(saleError?.message || '')
+          if (/credit limit|insufficient stock|tampering|total mismatch|not found|no active tenant|invalid/i.test(msg)) {
+            throw saleError
+          }
+          const reachable = await checkNow()
+          if (reachable) {
+            const retry = await supabase.rpc('create_sale', { sale_data: saleData })
+            saleId = retry.data
+            saleError = retry.error
+          }
+        }
 
         if (saleError) throw saleError
 
