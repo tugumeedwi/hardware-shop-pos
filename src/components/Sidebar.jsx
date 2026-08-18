@@ -14,6 +14,7 @@ import {
   UserCog,
   Settings,
   FileCheck,
+  Printer,
   ShieldCheck,
   Plus,
   X,
@@ -60,6 +61,7 @@ export default function Sidebar({ open, onClose, isOwner, isPlatformAdmin }) {
         items: [
           { to: '/users', label: 'Users', icon: UserCog },
           { to: '/settings', label: 'Settings', icon: Settings },
+          { to: '/settings/receipt', label: 'Receipt Settings', icon: Printer },
           { to: '/tax-settings', label: 'Tax Settings', icon: FileCheck },
         ],
       }

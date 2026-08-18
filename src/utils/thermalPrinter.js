@@ -64,13 +64,18 @@ function buildReceiptCommands({
   title, items, subtotal, discount, total,
   paymentMethod, amountPaid, customerName,
   date, saleId, isQuote
-}) {
+}, settings = {}) {
+  // Line widths: standard templates use 48 characters per line, thermal 42.
+  // ESC/POS receipts are fixed-width; exceeding the width wraps mid-line.
+  const lineWidth = settings.template === 'thermal' ? 42 : 48
+  const divider = '-'.repeat(lineWidth)
+  const businessName = settings.businessName || title || 'SalesHub POS'
   const commands = []
 
   // Initialize printer
   commands.push('\x1B\x40')         // ESC @  - Initialize
   commands.push('\x1B\x61\x01')     // ESC a 1 - Center align
-  commands.push(sanitizeESC(title?.toUpperCase() || '') + '\n\n')
+  commands.push(sanitizeESC(businessName?.toUpperCase().substring(0, lineWidth) || '') + '\n')
   commands.push(isQuote ? 'QUOTATION' : 'SALE RECEIPT' + '\n')
   commands.push(`#${saleId?.slice(0,8) || ''}\n`)
   commands.push(`${sanitizeESC(date || '')}\n\n`)
@@ -80,11 +85,11 @@ function buildReceiptCommands({
   if (customerName) {
     commands.push(`Customer: ${sanitizeESC(customerName)}\n`)
   }
-  commands.push('--------------------------------\n')
+  commands.push(divider + '\n')
 
   // Header
-  commands.push(padColumns('Item', 'Qty', 'Price', 'Total') + '\n')
-  commands.push('--------------------------------\n')
+  commands.push(padColumns('Item', 'Qty', 'Price', 'Total', lineWidth) + '\n')
+  commands.push(divider + '\n')
 
   // Items – sanitize names
   for (const item of items) {
@@ -92,10 +97,10 @@ function buildReceiptCommands({
     const qty = `${item.quantity_sold} ${sanitizeESC(item.selling_unit || '')}`
     const price = item.unit_price.toFixed(2)
     const lineTotal = item.line_total.toFixed(2)
-    commands.push(padColumns(name, qty, price, lineTotal) + '\n')
+    commands.push(padColumns(name, qty, price, lineTotal, lineWidth) + '\n')
   }
 
-  commands.push('--------------------------------\n')
+  commands.push(divider + '\n')
   commands.push(`Subtotal: ${subtotal.toFixed(2)}\n`)
   if (discount > 0) {
     commands.push(`Discount: -${discount.toFixed(2)}\n`)
@@ -113,21 +118,39 @@ function buildReceiptCommands({
     }
   }
 
+  // Footer – configurable per tenant. Logo printing over ESC/POS requires
+  // raster bitmap conversion (ESC * / GS v 0) which is intentionally left for
+  // a future iteration; only text branding is sent for now.
+  const footer = settings.footerText || ''
+  if (footer) {
+    commands.push('\n')
+    commands.push('\x1B\x61\x01')   // ESC a 1 - Center align
+    commands.push(sanitizeESC(footer.substring(0, lineWidth * 3)) + '\n')
+  }
+
   commands.push('\n\n')
   commands.push('\x1D\x56\x00')     // GS V 0 - Full paper cut
   return commands.join('')
 }
 
-function padColumns(col1, col2, col3, col4) {
-  const s1 = col1.padEnd(20).substring(0,20)
-  const s2 = col2.padEnd(8).substring(0,8)
-  const s3 = col3.padEnd(10).substring(0,10)
-  const s4 = col4.padEnd(10).substring(0,10)
+function padColumns(col1, col2, col3, col4, lineWidth) {
+  // Column budget depends on the template width: standard 20+8+10+10, thermal
+  // scales the name column down to keep all four columns on one line.
+  const totalCols = 48
+  const scale = Math.min(1, lineWidth / totalCols)
+  const w1 = Math.floor(20 * scale)
+  const w2 = Math.floor(8 * scale)
+  const w3 = Math.floor(10 * scale)
+  const w4 = lineWidth - w1 - w2 - w3
+  const s1 = col1.padEnd(w1).substring(0, w1)
+  const s2 = col2.padEnd(w2).substring(0, w2)
+  const s3 = col3.padEnd(w3).substring(0, w3)
+  const s4 = col4.padEnd(w4).substring(0, w4)
   return s1 + s2 + s3 + s4
 }
 
 // Main print function
-export async function printThermal(receiptData) {
+export async function printThermal(receiptData, settings = {}) {
   if (!qzAvailable) {
     const initialized = await initQZ()
     if (!initialized) {
@@ -144,7 +167,7 @@ export async function printThermal(receiptData) {
     if (printers.length === 0) throw new Error('No printer found')
     const printer = printers[0]
 
-    const commands = buildReceiptCommands(receiptData)
+    const commands = buildReceiptCommands(receiptData, settings)
     const data = [{
       type: 'raw',
       format: 'plain',

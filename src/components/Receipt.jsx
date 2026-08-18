@@ -1,12 +1,24 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../api/supabaseClient'
+import { useAuth } from '../context/AuthContext'
 import { printThermal, initQZ } from '../utils/thermalPrinter'
 
 export default function Receipt({ saleId, onClose }) {
+  const { tenant } = useAuth()
   const [sale, setSale] = useState(null)
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [thermalReady, setThermalReady] = useState(false)
+  const [logoUrl, setLogoUrl] = useState(null)
+
+  const receipt = {
+    businessName: tenant?.receipt_business_name || tenant?.name || 'SalesHub POS',
+    logoUrl: tenant?.receipt_logo_url || null,
+    footerText: tenant?.receipt_footer_text || null,
+    accentColor: tenant?.receipt_accent_color || '#1E293B',
+    showTax: !!tenant?.receipt_show_tax,
+    template: tenant?.receipt_template || 'standard'
+  }
 
   const fetchSale = useCallback(async () => {
     // Fetch sale with customer
@@ -56,7 +68,12 @@ const handleThermalPrint = () => {
     saleId: sale.id,
     isQuote: sale.type === 'quotation'
   }
-  printThermal(receiptData)
+  printThermal(receiptData, {
+    businessName: receipt.businessName,
+    footerText: receipt.footerText,
+    showTax: receipt.showTax,
+    template: receipt.template
+  })
 }
 
   useEffect(() => {
@@ -68,17 +85,31 @@ const handleThermalPrint = () => {
     initQZ().then(ok => setThermalReady(ok))
   }, [])
 
+  // Load the tenant logo from the private bucket using the authenticated client.
+  useEffect(() => {
+    if (!receipt.logoUrl || !tenant?.id) return
+    let active = true
+    supabase.storage
+      .from('tenant-logos')
+      .download(receipt.logoUrl)
+      .then(({ data, error }) => {
+        if (error) throw error
+        if (active) setLogoUrl(URL.createObjectURL(data))
+      })
+      .catch(err => console.warn('Failed to load receipt logo:', err.message))
+    return () => { active = false }
+  }, [receipt.logoUrl, tenant?.id])
+
 
   if (loading) return <div className="p-4 text-center">Loading receipt...</div>
   if (!sale) return <div className="p-4 text-center">Sale not found.</div>
 
   const isQuote = sale.type === 'quotation'
   const title = isQuote ? 'QUOTATION' : 'RECEIPT'
-
-  // Print-specific CSS will be in index.css (we'll add it next)
+  const isThermal = receipt.template === 'thermal'
 
   return (
-    <div className="receipt-container bg-card max-w-3xl mx-auto p-6 print:shadow-none print:p-0">
+    <div className={`receipt-container bg-card max-w-3xl mx-auto p-6 print:shadow-none print:p-0 ${isThermal ? 'max-w-sm font-mono' : ''}`}>
       {/* Print/Close buttons (hidden in print) */}
       <div className="flex justify-end gap-2 mb-4 print:hidden">
         <button onClick={handlePrint} className="bg-primary text-white px-4 py-2 rounded hover:bg-primary-hover">
@@ -101,10 +132,18 @@ const handleThermalPrint = () => {
 
       {/* Receipt Content */}
       <div className="receipt-content text-sm">
-        <div className="text-center mb-4">
-          <h1 className="text-2xl font-bold">{title}</h1>
-          {isQuote && <p className="text-base">Quote #{sale.id.slice(0, 8)}</p>}
-          {!isQuote && <p className="text-base">Sale #{sale.id.slice(0, 8)}</p>}
+        {/* Header – shop branding with the configured accent colour */}
+        <div
+          className="text-center mb-4 p-3 rounded-lg text-white"
+          style={{ backgroundColor: receipt.accentColor }}
+        >
+          {receipt.logoUrl && logoUrl && (
+            <img src={logoUrl} alt="Shop logo" className="h-16 w-16 object-contain mx-auto mb-2 rounded bg-white" />
+          )}
+          <h1 className="text-2xl font-bold">{receipt.businessName}</h1>
+          <p className="text-base opacity-90">{title}</p>
+          {isQuote && <p className="text-sm opacity-80">Quote #{sale.id.slice(0, 8)}</p>}
+          {!isQuote && <p className="text-sm opacity-80">Sale #{sale.id.slice(0, 8)}</p>}
         </div>
 
         <div className="grid grid-cols-2 gap-2 mb-4">
@@ -158,7 +197,16 @@ const handleThermalPrint = () => {
               <span>Discount:</span>
               <span>-{sale.discount_total.toFixed(2)}</span>
             </div>
-            <div className="flex justify-between font-bold text-base border-t border-border-dark pt-1">
+            {receipt.showTax && sale.tax_amount > 0 && (
+              <div className="flex justify-between py-1">
+                <span>Tax:</span>
+                <span>{sale.tax_amount.toFixed(2)}</span>
+              </div>
+            )}
+            <div
+              className="flex justify-between font-bold text-base border-t border-border-dark pt-1 text-white px-2 py-1 rounded"
+              style={{ backgroundColor: receipt.accentColor }}
+            >
               <span>NET TOTAL:</span>
               <span>{sale.total_amount.toFixed(2)}</span>
             </div>
@@ -185,6 +233,13 @@ const handleThermalPrint = () => {
         {isQuote && sale.expiry_date && (
           <div className="mt-4 text-center text-red-600">
             Valid until: {new Date(sale.expiry_date + 'T23:59:59').toLocaleDateString()}
+          </div>
+        )}
+
+        {/* Footer text */}
+        {receipt.footerText && (
+          <div className="mt-6 text-center text-xs text-text-muted border-t border-border pt-3">
+            {receipt.footerText}
           </div>
         )}
       </div>

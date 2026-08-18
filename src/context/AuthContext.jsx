@@ -87,7 +87,7 @@ export function AuthProvider({ children }) {
   async function fetchMemberships(user) {
     const { data, error } = await supabase
       .from('tenant_memberships')
-      .select('tenant_id, role, tenants!inner(id, name, industry, business_rules, business_type, subscription_status, subscription_end_date, tax_enabled)')
+      .select('tenant_id, role, tenants!inner(id, name, industry, business_rules, business_type, subscription_status, subscription_end_date, tax_enabled, receipt_logo_url, receipt_business_name, receipt_footer_text, receipt_accent_color, receipt_show_tax, receipt_template)')
       .eq('user_id', user?.id)
 
     if (error) {
@@ -141,7 +141,13 @@ export function AuthProvider({ children }) {
           business_type: m.tenants?.business_type || 'hardware',
           subscription_status: m.tenants?.subscription_status || null,
           subscription_end_date: m.tenants?.subscription_end_date || null,
-          tax_enabled: m.tenants?.tax_enabled || false
+          tax_enabled: m.tenants?.tax_enabled || false,
+          receipt_logo_url: m.tenants?.receipt_logo_url || null,
+          receipt_business_name: m.tenants?.receipt_business_name || null,
+          receipt_footer_text: m.tenants?.receipt_footer_text || null,
+          receipt_accent_color: m.tenants?.receipt_accent_color || '#1E293B',
+          receipt_show_tax: m.tenants?.receipt_show_tax || false,
+          receipt_template: m.tenants?.receipt_template || 'standard'
         }
       }))
     } catch (cacheErr) {
@@ -195,7 +201,13 @@ export function AuthProvider({ children }) {
         business_type: membership.tenants?.business_type || 'hardware',
         subscription_status: membership.tenants?.subscription_status || null,
         subscription_end_date: membership.tenants?.subscription_end_date || null,
-        tax_enabled: membership.tenants?.tax_enabled || false
+        tax_enabled: membership.tenants?.tax_enabled || false,
+        receipt_logo_url: membership.tenants?.receipt_logo_url || null,
+        receipt_business_name: membership.tenants?.receipt_business_name || null,
+        receipt_footer_text: membership.tenants?.receipt_footer_text || null,
+        receipt_accent_color: membership.tenants?.receipt_accent_color || '#1E293B',
+        receipt_show_tax: membership.tenants?.receipt_show_tax || false,
+        receipt_template: membership.tenants?.receipt_template || 'standard'
       })
       setNeedsTenantSelection(false)
       localStorage.setItem('selectedTenantId', tenantId)
@@ -214,6 +226,31 @@ export function AuthProvider({ children }) {
     await applyTenant(membership, session?.user?.user_metadata?.tenant_id)
   }
 
+  // Re-fetch the active tenant row so settings saved on other pages (receipt
+  // customisation, tax settings) propagate to the whole app immediately
+  // without a full reload.
+  async function refreshTenant() {
+    if (!tenant?.id) return tenant
+    try {
+      const { data, error } = await supabase
+        .from('tenants')
+        .select('*')
+        .eq('id', tenant.id)
+        .single()
+      if (error) throw error
+      if (data) {
+        setTenant(prev => ({
+          ...prev,
+          ...data,
+          membership_role: prev?.membership_role || tenant.membership_role
+        }))
+      }
+    } catch (err) {
+      console.warn('Failed to refresh tenant:', err.message)
+    }
+    return tenant
+  }
+
   const value = {
     session,
     profile,
@@ -222,7 +259,8 @@ export function AuthProvider({ children }) {
     tenants,
     needsTenantSelection,
     isRecoverySession,
-    selectTenant
+    selectTenant,
+    refreshTenant
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

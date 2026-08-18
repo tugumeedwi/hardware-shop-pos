@@ -19,6 +19,7 @@ const SalesHistory = lazy(() => import('./pages/SalesHistory'))
 const SyncConflicts = lazy(() => import('./pages/SyncConflicts'))
 const UserManagement = lazy(() => import('./pages/UserManagement'))
 const Settings = lazy(() => import('./pages/Settings'))
+const ReceiptSettings = lazy(() => import('./pages/ReceiptSettings'))
 const TaxSettings = lazy(() => import('./pages/TaxSettings'))
 const Pricing = lazy(() => import('./pages/Pricing'))
 const Payments = lazy(() => import('./pages/Payments'))
@@ -177,6 +178,7 @@ function AppInner() {
             <Route path="/conflicts" element={<PrivateRoute roleRequired="owner"><SyncConflicts /></PrivateRoute>} />
             <Route path="/users" element={<PrivateRoute roleRequired="owner"><UserManagement /></PrivateRoute>} />
             <Route path="/settings" element={<PrivateRoute roleRequired="owner"><Settings /></PrivateRoute>} />
+            <Route path="/settings/receipt" element={<PrivateRoute roleRequired="owner"><ReceiptSettings /></PrivateRoute>} />
             <Route path="/tax-settings" element={<PrivateRoute roleRequired="owner"><TaxSettings /></PrivateRoute>} />
             <Route path="/payments" element={<PrivateRoute><Payments /></PrivateRoute>} />
             <Route path="/pricing" element={<PrivateRoute roleRequired="owner"><Pricing /></PrivateRoute>} />

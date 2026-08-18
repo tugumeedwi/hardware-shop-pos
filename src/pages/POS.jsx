@@ -40,7 +40,7 @@ export default function POS() {
   const [scannerActive, setScannerActive] = useState(false)
   const [cameraOpen, setCameraOpen] = useState(false)
   const scannerRef = useRef(null)
-  const cameraRegionId = useState(() => `qr-camera-${Math.random().toString(36).slice(2)}`)[0]
+  const cameraRegionRef = useRef(null)
   const lowStockCount = products.filter(p => p.stock_quantity <= (p.low_stock_threshold || 10)).length
 
   // Single entry point for a decoded scan: 15-17 digit numeric -> IMEI of a
@@ -109,12 +109,30 @@ export default function POS() {
     setProducts(localProducts)
   }, [])
 
+  // Mirror the full customer list into IndexedDB so phone lookup keeps working
+  // offline. Tenant scoping is enforced server-side by RLS + get_my_tenant(),
+  // so the client only ever sees its own shop's customers.
+  const loadCustomers = useCallback(async () => {
+    try {
+      const { data, error } = await supabase.from('customers').select('*')
+      if (error) throw error
+      if (data && data.length > 0) {
+        await db.customers.clear()
+        await db.customers.bulkPut(data)
+      }
+    } catch (e) {
+      console.warn('Customer fetch failed, keeping local cache:', e.message)
+    }
+  }, [])
+
   useEffect(() => {
     const t = setTimeout(loadProducts, 0)
+    loadCustomers()
     const onReconnect = () => {
       // The network probe confirmed connectivity; pull the live catalog so the
       // offline state is never left stuck on stale mirrors.
       loadProducts()
+      loadCustomers()
       checkNow()
     }
     window.addEventListener('reconnected', onReconnect)
@@ -122,14 +140,17 @@ export default function POS() {
       clearTimeout(t)
       window.removeEventListener('reconnected', onReconnect)
     }
-  }, [loadProducts, checkNow])
+  }, [loadProducts, loadCustomers, checkNow])
 
   // auto-refresh on sync completion
   useEffect(() => {
-    const handler = () => loadProducts()
+    const handler = () => {
+      loadProducts()
+      loadCustomers()
+    }
     window.addEventListener('syncCompleted', handler)
     return () => window.removeEventListener('syncCompleted', handler)
-  }, [loadProducts])
+  }, [loadProducts, loadCustomers])
 
   // Barcode scanner via global keydown (USB wedge). Buffers keystrokes and
   // only handles a scan once the device sends Enter, using the ref so the
@@ -155,12 +176,14 @@ export default function POS() {
 
   // Mobile camera scanner: show the camera view on demand, decode a barcode /
   // QR once, add it to the cart and stop the camera immediately after.
+  // The effect only runs after the QR container is mounted (cameraOpen gates
+  // the render and the ref guarantees the element exists when we start).
   useEffect(() => {
     if (!cameraOpen) return
+    if (!cameraRegionRef.current) return
 
     let cancelled = false
     let scanner = null
-    let timer = null
 
     const start = async () => {
       try {
@@ -198,7 +221,7 @@ export default function POS() {
 
         if (!permissionGranted) return
 
-        scanner = new Html5Qrcode(cameraRegionId.current)
+        scanner = new Html5Qrcode(cameraRegionRef.current)
         await scanner.start(
           { facingMode: 'environment' },
           { fps: 10, qrbox: { width: 260, height: 160 } },
@@ -219,21 +242,19 @@ export default function POS() {
         if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
           toast.error('Camera permission denied. You can use keyboard scanner instead.')
         } else {
-          toast.error('Could not open camera. Check permissions.')
+          toast.error('Could not start camera. Please ensure permission is granted.')
         }
       }
     }
 
-    // Small delay so the placeholder element exists and the modal transition
-    // has settled before the camera initialises.
-    timer = setTimeout(start, 150)
+    start()
 
+    // Stop and release the camera when the modal closes or a scan completes.
     return () => {
       cancelled = true
-      if (timer) clearTimeout(timer)
       if (scanner) scanner.stop().catch(() => {})
     }
-  }, [cameraOpen, cameraRegionId])
+  }, [cameraOpen])
 
   // Warn before leaving if cart has items
   useEffect(() => {
@@ -310,7 +331,8 @@ export default function POS() {
         setCustomerLookupError('')
       } else {
         setSelectedCustomer(null)
-        setCustomerLookupError('Offline: customer not found in local cache')
+        setCustomerLookupError('Customer not found offline')
+        toast.error('Customer not cached for offline use. Please connect to the internet first.')
       }
       return
     }
@@ -335,6 +357,8 @@ export default function POS() {
     } else {
       setSelectedCustomer(data[0])
       setCustomerLookupError('')
+      // Keep the local mirror warm so this customer is available offline later.
+      await db.customers.put(data[0]).catch(() => {})
     }
   }
 
@@ -523,7 +547,11 @@ export default function POS() {
 
       {/* Scanning indicator – shows while the keyboard wedge is buffering */}
       {scannerActive && (
-        <div className="fixed bottom-5 right-5 z-40 flex items-center gap-2 bg-sidebar/90 text-white text-sm font-medium px-4 py-2.5 rounded-full shadow-xl animate-pulse">
+        <div className="fixed bottom-5 right-5 z-40 flex items-center gap-2 bg-sidebar/90 text-white text-sm font-medium px-4 py-2.5 rounded-full shadow-xl">
+          <span className="relative flex h-2.5 w-2.5">
+            <span className="absolute inline-flex h-full w-full rounded-full bg-primary opacity-75 animate-ping" />
+            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-primary" />
+          </span>
           <svg className="h-4 w-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6M7 4H5a2 2 0 00-2 2v2m0 8v2a2 2 0 002 2h2m8-16h2a2 2 0 012 2v2m0 8v2a2 2 0 01-2 2h-2" />
           </svg>
@@ -539,7 +567,12 @@ export default function POS() {
               <h3 className="text-lg font-bold text-heading">Scan Barcode</h3>
               <button onClick={() => setCameraOpen(false)} className="text-text-muted hover:text-text text-xl leading-none">✕</button>
             </div>
-            <div id={cameraRegionId} className="w-full aspect-square bg-sidebar rounded-xl overflow-hidden" />
+            <div
+              id="qr-reader"
+              ref={cameraRegionRef}
+              className="w-full aspect-square bg-sidebar rounded-xl overflow-hidden"
+              style={{ width: '100%', maxWidth: '300px', margin: 'auto' }}
+            />
             <p className="text-xs text-text mt-3 text-center">
               Point the camera at a product barcode or QR code.
             </p>
