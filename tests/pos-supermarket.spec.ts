@@ -7,6 +7,25 @@ test.beforeAll(() => {
   data = loadTestData()
 })
 
+test('cashier scans a product by SKU through the cached lookup', async ({ page }) => {
+  await login(page, data.supermarket.cashier.email, data.password)
+
+  const sugar = data.supermarket.sugar
+
+  await expect(page.getByRole('button', { name: new RegExp(esc(sugar.name)) }).first()).toBeVisible({ timeout: 15_000 })
+
+  // Blur any focused input, then scan the SKU with the keyboard wedge.
+  await page.getByRole('heading', { name: 'Checkout' }).click()
+  await page.keyboard.type(sugar.sku!, { delay: 5 })
+  await page.keyboard.press('Enter')
+
+  const cart = page.locator('.max-h-64')
+  await expect(cart.getByText(new RegExp(esc(sugar.name)))).toBeVisible({ timeout: 10_000 })
+
+  await page.getByRole('button', { name: 'Complete Sale' }).click()
+  await expect(page.getByText('Sale completed')).toBeVisible({ timeout: 20_000 })
+})
+
 test('cashier scans barcodes at the till and the receipt includes VAT for taxed items', async ({ page }) => {
   await login(page, data.supermarket.cashier.email, data.password)
 

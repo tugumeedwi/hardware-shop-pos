@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { Html5Qrcode } from 'html5-qrcode'
 import { supabase } from '../api/supabaseClient'
 import { useAuth } from '../context/AuthContext'
@@ -9,6 +9,11 @@ import { useRealtimeSubscription } from '../hooks/useRealtime'
 import { useOnlineStatus } from '../hooks/useOnlineStatus'
 import { normalisePhone } from '../utils/phoneUtils'
 import { queueTaxInvoiceAfterSale } from '../utils/syncManager'
+import { Scale } from 'lucide-react'
+
+// Upper bound for a single scale reading. Retail counter scales top out far
+// below this, so anything larger is a mis-read rather than a real weight.
+const MAX_WEIGHT_KG = 999
 
 export default function POS() {
   const { profile, tenant } = useAuth()
@@ -33,6 +38,11 @@ export default function POS() {
   const [newCustomerName, setNewCustomerName] = useState('')
   const [lastSaleId, setLastSaleId] = useState(null)
   const [processing, setProcessing] = useState(false)
+  // Weight scale support: a kg product armed for weighing, and the most recent
+  // scale reading so a weight scanned before a product is picked can be applied
+  // as soon as the cashier taps Weigh.
+  const [weighingProduct, setWeighingProduct] = useState(null)
+  const [pendingWeight, setPendingWeight] = useState(null)
 
   // Barcode/IMEI scanner (USB keyboard wedge + mobile camera).
   // The keyboard handler buffers keystrokes until Enter; the camera handler
@@ -45,6 +55,31 @@ export default function POS() {
   const cameraRegionRef = useRef(null)
   const lowStockCount = products.filter(p => p.stock_quantity <= (p.low_stock_threshold || 10)).length
 
+  // O(1) lookup maps for scanned barcodes / SKUs / IMEIs, rebuilt only when the
+  // catalogue changes instead of a linear scan per scan event. Barcodes are
+  // indexed first so a barcode match always beats a SKU collision, mirroring the
+  // priority of the old products.find() fallback chain.
+  const lookupMap = useMemo(() => {
+    const byKey = new Map()
+    const byImei = new Map()
+    for (const p of products) {
+      if (p.barcode) {
+        const b = String(p.barcode).trim().toLowerCase()
+        if (b && !byKey.has(b)) byKey.set(b, p)
+      }
+      const attrs = p.attributes || {}
+      const imei = attrs.imei || attrs.IMEI
+      if (imei) byImei.set(String(imei).trim(), p)
+    }
+    for (const p of products) {
+      if (p.sku) {
+        const s = String(p.sku).trim().toLowerCase()
+        if (s && !byKey.has(s)) byKey.set(s, p)
+      }
+    }
+    return { byKey, byImei }
+  }, [products])
+
   // Single entry point for a decoded scan: 15-17 digit numeric -> IMEI of a
   // phone product; otherwise match by SKU. Clears the keyboard buffer on use.
   // Kept as a plain function (recreated each render) so it always closes over
@@ -54,13 +89,38 @@ export default function POS() {
     scannerRef.current = ''
     if (!text) return
 
+    // Weight scale support. A reading with a decimal point is unambiguously a
+    // scale value because barcodes and IMEIs are digits only. A whole number is
+    // only read as a weight while a product is armed AND it is short enough not
+    // to be a barcode (EAN-8 is 8 digits, EAN-13 is 13, IMEIs are 15-17), so
+    // scanning a packaged item mid-weigh still adds that item instead of
+    // charging thousands of kilos.
+    const hasDecimalPoint = /^\d+\.\d+$/.test(text)
+    const isShortWholeNumber = /^\d{1,3}$/.test(text)
+    if (hasDecimalPoint || (weighingProduct && isShortWholeNumber)) {
+      const weight = parseFloat(text)
+      if (!(weight > 0)) {
+        toast.error('Weight must be greater than zero')
+      } else if (weight > MAX_WEIGHT_KG) {
+        toast.error(`Weight ${text} kg looks invalid`)
+      } else if (weighingProduct) {
+        addToCart(weighingProduct, { sellingUnit: 'kg', quantity: weight })
+        toast.success(`Added ${weight} kg of ${weighingProduct.name}`)
+        setWeighingProduct(null)
+        setPendingWeight(null)
+      } else {
+        setPendingWeight(weight)
+        toast(`Weight detected: ${text} kg. Select a product to weigh.`)
+      }
+      setScannerActive(false)
+      return
+    }
+
     if (/^\d{15,17}$/.test(text)) {
-      const phone = products.find(p => {
-        const attrs = p.attributes || {}
-        return attrs.imei === text || attrs.IMEI === text
-      })
+      const phone = lookupMap.byImei.get(text)
       if (phone) {
         addToCart(phone, { sellingUnit: 'piece', unitPrice: phone.price_per_piece })
+        setPendingWeight(null)
         toast.success(`Added ${phone.name}`)
       } else {
         toast.error('Phone with IMEI not found')
@@ -68,9 +128,10 @@ export default function POS() {
     } else {
       // Supermarket scanning: match the EAN/UPC barcode first, then fall back
       // to a plain SKU match so legacy catalogue data keeps working.
-      const product = products.find(p => p.barcode === text) || products.find(p => p.sku === text)
+      const product = lookupMap.byKey.get(text.toLowerCase())
       if (product) {
         addToCart(product)
+        setPendingWeight(null)
         toast.success(`Added ${product.name}`)
       } else {
         toast.error(`No product with barcode/SKU ${text}`)
@@ -302,7 +363,7 @@ export default function POS() {
     setCart([...cart, {
       product,
       sellingUnit: defaultUnit,
-      quantity: 1,
+      quantity: overrides.quantity !== undefined ? overrides.quantity : 1,
       unitPrice: unitPrice || 0
     }])
   }
@@ -321,6 +382,19 @@ export default function POS() {
   }
 
   const removeFromCart = (index) => setCart(cart.filter((_, i) => i !== index))
+
+  // Arm/unarm a kg product for the weight scale. If the cashier already scanned
+  // a weight, apply it immediately instead of asking them to re-weigh.
+  const handleWeighClick = (product) => {
+    if (pendingWeight !== null) {
+      addToCart(product, { sellingUnit: 'kg', quantity: pendingWeight })
+      toast.success(`Added ${pendingWeight} kg of ${product.name}`)
+      setPendingWeight(null)
+      setWeighingProduct(null)
+      return
+    }
+    setWeighingProduct(prev => (prev && prev.id === product.id ? null : product))
+  }
 
   const totalBeforeDiscount = cart.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0)
   const taxAmount = cart.reduce(
@@ -523,6 +597,8 @@ export default function POS() {
     setCustomerPhoneInput('')
     setSelectedCustomer(null)
     setCustomerLookupError('')
+    setWeighingProduct(null)
+    setPendingWeight(null)
     if (!saleCompletedOnline) loadProducts()
     setProcessing(false)
   }
@@ -619,46 +695,74 @@ export default function POS() {
             </button>
           </div>
 
+          {/* Weighing indicator – shows while a kg product is armed for the scale */}
+          {weighingProduct && (
+            <div className="flex items-center justify-between bg-primary-soft border border-primary-light rounded-xl px-4 py-3">
+              <p className="text-sm font-medium text-heading flex items-center gap-2">
+                <Scale className="h-4 w-4 text-primary" />
+                Weighing <span className="font-bold">{weighingProduct.name}</span> — scan or type weight (kg) then press Enter
+              </p>
+              <button onClick={() => setWeighingProduct(null)} className="text-xs font-semibold text-text-muted hover:text-text">Cancel</button>
+            </div>
+          )}
+
           {/* Product grid */}
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 max-h-[65vh] overflow-y-auto pr-1">
             {filteredProducts.map(product => (
-              <button
-                key={product.id}
-                onClick={() => addToCart(product)}
-                className="group relative bg-card border border-border rounded-xl p-4 text-left shadow-sm hover:shadow-md hover:scale-[1.02] active:scale-100 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary"
-              >
-                <div className="font-semibold text-heading text-sm leading-tight">{product.name}</div>
-                {product.barcode && (
-                  <div className="mt-1 flex items-center gap-1">
-                    <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-surface text-text truncate max-w-full">
-                      {product.barcode}
-                    </span>
-                  </div>
-                )}
-                {product.attributes?.imei && (
-                  <div className="mt-1 flex items-center gap-1">
-                    <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-surface text-text truncate max-w-full">
-                      IMEI: {product.attributes.imei}
-                    </span>
-                  </div>
-                )}
-                <div className="flex items-center justify-between mt-1">
-                  <span className="text-xs text-text">Stock: {product.stock_quantity}</span>
-                  {product.stock_quantity <= (product.low_stock_threshold || 10) && (
-                    <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-700 animate-pulse">
-                      LOW
-                    </span>
+              <div key={product.id} className="relative">
+                <button
+                  onClick={() => { setWeighingProduct(null); addToCart(product) }}
+                  className="group relative w-full bg-card border border-border rounded-xl p-4 text-left shadow-sm hover:shadow-md hover:scale-[1.02] active:scale-100 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary"
+                >
+                  <div className="font-semibold text-heading text-sm leading-tight">{product.name}</div>
+                  {product.barcode && (
+                    <div className="mt-1 flex items-center gap-1">
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-surface text-text truncate max-w-full">
+                        {product.barcode}
+                      </span>
+                    </div>
                   )}
-                </div>
-                <div className="mt-2 text-xs font-bold text-text-strong">
-                  {product.active_pricing_methods?.[0] === 'piece' && `Pc: ${product.price_per_piece}`}
-                  {product.active_pricing_methods?.[0] === 'box' && `Box: ${product.price_per_box}`}
-                  {product.active_pricing_methods?.[0] === 'sqm' && `Sqm: ${product.price_per_sqm}`}
-                  {product.active_pricing_methods?.[0] === 'kg' && `Kg: ${product.price_per_kg}`}
-                </div>
-                {/* subtle accent hover line */}
-                <div className="absolute inset-x-0 bottom-0 h-1 bg-primary rounded-b-xl opacity-0 group-hover:opacity-100 transition-opacity" />
-              </button>
+                  {product.attributes?.imei && (
+                    <div className="mt-1 flex items-center gap-1">
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-surface text-text truncate max-w-full">
+                        IMEI: {product.attributes.imei}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between mt-1">
+                    <span className="text-xs text-text">Stock: {product.stock_quantity}</span>
+                    {product.stock_quantity <= (product.low_stock_threshold || 10) && (
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-700 animate-pulse">
+                        LOW
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-2 text-xs font-bold text-text-strong">
+                    {product.active_pricing_methods?.[0] === 'piece' && `Pc: ${product.price_per_piece}`}
+                    {product.active_pricing_methods?.[0] === 'box' && `Box: ${product.price_per_box}`}
+                    {product.active_pricing_methods?.[0] === 'sqm' && `Sqm: ${product.price_per_sqm}`}
+                    {product.active_pricing_methods?.[0] === 'kg' && `Kg: ${product.price_per_kg}`}
+                  </div>
+                  {/* subtle accent hover line */}
+                  <div className="absolute inset-x-0 bottom-0 h-1 bg-primary rounded-b-xl opacity-0 group-hover:opacity-100 transition-opacity" />
+                </button>
+                {/* Weigh button – only for products sold by weight. A sibling of
+                    the card button (never nested) so the grid button stays intact. */}
+                {(product.active_pricing_methods || []).includes('kg') && (
+                  <button
+                    onClick={() => handleWeighClick(product)}
+                    aria-label={`Weigh ${product.name}`}
+                    className={`absolute top-2 right-2 z-10 inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold shadow transition-colors ${
+                      weighingProduct?.id === product.id
+                        ? 'bg-primary text-white'
+                        : 'bg-card border border-primary-light text-primary hover:bg-primary hover:text-white'
+                    }`}
+                  >
+                    <Scale className="h-3 w-3" />
+                    {weighingProduct?.id === product.id ? 'Weighing' : 'Weigh'}
+                  </button>
+                )}
+              </div>
             ))}
           </div>
         </div>

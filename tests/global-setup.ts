@@ -11,6 +11,22 @@ import 'dotenv/config'
 
 const PASSWORD_BASE = 'QaPass!2026'
 
+// The QA harness talks to a remote Supabase instance; retry transient network
+// failures (connect timeouts) so a blip does not abort the whole run.
+async function withRetry<T>(label: string, fn: () => Promise<T>, attempts = 4): Promise<T> {
+  let lastErr: unknown
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await fn()
+    } catch (e) {
+      lastErr = e
+      console.warn(`[global-setup] ${label} attempt ${i + 1} failed, retrying…`)
+      await new Promise(r => setTimeout(r, 3000))
+    }
+  }
+  throw lastErr
+}
+
 async function createTenant(
   svc: SupabaseClient,
   name: string,
@@ -19,13 +35,15 @@ async function createTenant(
   planId: string | null = null,
   extra: Record<string, unknown> = {}
 ): Promise<string> {
-  const { data, error } = await svc
-    .from('tenants')
-    .insert({ name, business_type: businessType, subscription_status: subscriptionStatus, plan_id: planId, ...extra })
-    .select('id')
-    .single()
-  if (error) throw new Error(`createTenant ${name}: ${error.message}`)
-  return data.id
+  return withRetry(`createTenant ${name}`, async () => {
+    const { data, error } = await svc
+      .from('tenants')
+      .insert({ name, business_type: businessType, subscription_status: subscriptionStatus, plan_id: planId, ...extra })
+      .select('id')
+      .single()
+    if (error) throw new Error(`createTenant ${name}: ${error.message}`)
+    return data.id
+  })
 }
 
 async function createUser(
@@ -36,54 +54,58 @@ async function createUser(
   role: string,
   fullName: string
 ): Promise<string> {
-  const { data, error } = await svc.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: true,
-    ...(tenantId
-      ? { user_metadata: { tenant_id: tenantId }, app_metadata: { tenant_id: tenantId } }
-      : {})
+  return withRetry(`createUser ${email}`, async () => {
+    const { data, error } = await svc.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      ...(tenantId
+        ? { user_metadata: { tenant_id: tenantId }, app_metadata: { tenant_id: tenantId } }
+        : {})
+    })
+    if (error) throw new Error(`createUser ${email}: ${error.message}`)
+    const userId = data.user!.id
+    if (tenantId) {
+      const { error: memError } = await svc
+        .from('tenant_memberships')
+        .insert({ tenant_id: tenantId, user_id: userId, role })
+      if (memError) throw new Error(`membership ${email}: ${memError.message}`)
+    }
+    const { error: profError } = await svc.from('profiles').upsert({ id: userId, role, full_name: fullName })
+    if (profError) throw new Error(`profile ${email}: ${profError.message}`)
+    return userId
   })
-  if (error) throw new Error(`createUser ${email}: ${error.message}`)
-  const userId = data.user!.id
-  if (tenantId) {
-    const { error: memError } = await svc
-      .from('tenant_memberships')
-      .insert({ tenant_id: tenantId, user_id: userId, role })
-    if (memError) throw new Error(`membership ${email}: ${memError.message}`)
-  }
-  const { error: profError } = await svc.from('profiles').upsert({ id: userId, role, full_name: fullName })
-  if (profError) throw new Error(`profile ${email}: ${profError.message}`)
-  return userId
 }
 
 async function createProduct(svc: SupabaseClient, tenantId: string, p: ProductSeed): Promise<string> {
-  const { data, error } = await svc
-    .from('products')
-    .insert({
-      tenant_id: tenantId,
-      name: p.name,
-      sku: p.sku ?? null,
-      barcode: p.barcode ?? null,
-      category: p.category ?? 'general',
-      is_tile: p.is_tile ?? false,
-      stock_quantity: p.stock,
-      low_stock_threshold: 10,
-      price_per_piece: p.price.piece ?? null,
-      price_per_box: p.price.box ?? null,
-      price_per_sqm: p.price.sqm ?? null,
-      price_per_kg: p.price.kg ?? null,
-      pieces_per_box: p.pieces_per_box ?? null,
-      m2_per_piece: p.m2_per_piece ?? null,
-      pieces_per_kg: p.pieces_per_kg ?? null,
-      active_pricing_methods: p.active_pricing_methods,
-      attributes: p.attributes ?? {},
-      tax_rate: p.tax_rate ?? 0
-    })
-    .select('id')
-    .single()
-  if (error) throw new Error(`createProduct ${p.name}: ${error.message}`)
-  return data.id
+  return withRetry(`createProduct ${p.name}`, async () => {
+    const { data, error } = await svc
+      .from('products')
+      .insert({
+        tenant_id: tenantId,
+        name: p.name,
+        sku: p.sku ?? null,
+        barcode: p.barcode ?? null,
+        category: p.category ?? 'general',
+        is_tile: p.is_tile ?? false,
+        stock_quantity: p.stock,
+        low_stock_threshold: 10,
+        price_per_piece: p.price.piece ?? null,
+        price_per_box: p.price.box ?? null,
+        price_per_sqm: p.price.sqm ?? null,
+        price_per_kg: p.price.kg ?? null,
+        pieces_per_box: p.pieces_per_box ?? null,
+        m2_per_piece: p.m2_per_piece ?? null,
+        pieces_per_kg: p.pieces_per_kg ?? null,
+        active_pricing_methods: p.active_pricing_methods,
+        attributes: p.attributes ?? {},
+        tax_rate: p.tax_rate ?? 0
+      })
+      .select('id')
+      .single()
+    if (error) throw new Error(`createProduct ${p.name}: ${error.message}`)
+    return data.id
+  })
 }
 
 export default async function globalSetup() {
@@ -98,7 +120,7 @@ export default async function globalSetup() {
     password,
     hardware: { tenant_id: '', tenant_name: '', owner: null as any, cashier: null as any, tile: null as any, quotationItem: null as any },
     phones: { tenant_id: '', tenant_name: '', owner: null as any, cashier: null as any, phone: null as any },
-    supermarket: { tenant_id: '', tenant_name: '', owner: null as any, cashier: null as any, milk: null as any, bread: null as any, soda: null as any },
+    supermarket: { tenant_id: '', tenant_name: '', owner: null as any, cashier: null as any, milk: null as any, bread: null as any, soda: null as any, tomato: null as any, sugar: null as any },
     offline: { tenant_id: '', tenant_name: '', cashier: null as any, bolt: null as any },
     receipt: { tenant_id: '', tenant_name: '', owner: null as any, wire: null as any },
     payment: { tenant_id: '', tenant_name: '', owner: null as any },
@@ -203,6 +225,30 @@ export default async function globalSetup() {
       tax_rate: 18
     }
     data.supermarket.soda.id = await createProduct(svc, data.supermarket.tenant_id, data.supermarket.soda)
+    // Sold by weight: only kg pricing, used by the weight-scale POS tests.
+    data.supermarket.tomato = {
+      id: '',
+      name: `QA Loose Tomatoes ${runId}`,
+      sku: `QA-TOMATO-${runId}`,
+      barcode: '6000000000043',
+      category: 'produce',
+      stock: 20,
+      price: { kg: 4000 },
+      pieces_per_kg: 5,
+      active_pricing_methods: ['kg']
+    }
+    data.supermarket.tomato.id = await createProduct(svc, data.supermarket.tenant_id, data.supermarket.tomato)
+    // SKU-only product (no barcode) for the cached SKU-lookup test.
+    data.supermarket.sugar = {
+      id: '',
+      name: `QA Sugar Pack 1kg ${runId}`,
+      sku: `QA-SUGAR-${runId}`,
+      category: 'produce',
+      stock: 25,
+      price: { piece: 3500 },
+      active_pricing_methods: ['piece']
+    }
+    data.supermarket.sugar.id = await createProduct(svc, data.supermarket.tenant_id, data.supermarket.sugar)
   }
   await mkMilk()
 
@@ -258,11 +304,13 @@ export default async function globalSetup() {
   data.platformAdmin.user_id = await createUser(svc, data.platformAdmin.email, password, null, 'platform_admin', 'QA Platform Admin')
 
   // Sanity check: the shared password is actually accepted for the first user.
-  const { error: signInError } = await svc.auth.signInWithPassword({
-    email: data.hardware.owner.email,
-    password
+  await withRetry('sign-in verification', async () => {
+    const { error: signInError } = await svc.auth.signInWithPassword({
+      email: data.hardware.owner.email,
+      password
+    })
+    if (signInError) throw new Error(`Setup sign-in verification failed: ${signInError.message}`)
   })
-  if (signInError) throw new Error(`Setup sign-in verification failed: ${signInError.message}`)
 
   writeTestData(data)
   console.log(`[global-setup] created ${JSON.stringify(TEST_DATA_PATH)} runId=${runId}`)

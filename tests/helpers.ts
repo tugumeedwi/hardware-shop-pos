@@ -53,7 +53,7 @@ export interface TestData {
   password: string
   hardware: TenantSeed & { owner: UserSeed; cashier: UserSeed; tile: ProductSeed; quotationItem: ProductSeed }
   phones: TenantSeed & { owner: UserSeed; cashier: UserSeed; phone: ProductSeed }
-  supermarket: TenantSeed & { owner: UserSeed; cashier: UserSeed; milk: ProductSeed; bread: ProductSeed; soda: ProductSeed }
+  supermarket: TenantSeed & { owner: UserSeed; cashier: UserSeed; milk: ProductSeed; bread: ProductSeed; soda: ProductSeed; tomato: ProductSeed; sugar: ProductSeed }
   offline: TenantSeed & { cashier: UserSeed; bolt: ProductSeed }
   receipt: TenantSeed & { owner: UserSeed; wire: ProductSeed }
   payment: TenantSeed & { owner: UserSeed }
@@ -84,14 +84,23 @@ export function deleteTestDataFile() {
 /**
  * Logs a test user into the app and waits until the authenticated shell
  * renders. Platform admins are redirected to /admin/payments by the catch-all
- * route (they have no tenant), everyone else lands on /pos.
+ * route (they have no tenant), everyone else lands on /pos. Retries the submit
+ * if a transient network flake leaves us stuck on the login form.
  */
 export async function login(page: Page, email: string, password: string) {
   await page.goto('/login')
   await page.locator('input[type="email"]').fill(email)
   await page.locator('input[type="password"]').fill(password)
-  await page.getByRole('button', { name: 'Sign In' }).click()
-  await page.waitForURL(/(\/pos|\/admin\/payments)/, { timeout: 30_000 })
+  for (let attempt = 0; attempt < 3; attempt++) {
+    await page.getByRole('button', { name: 'Sign In' }).click()
+    try {
+      await page.waitForURL(/(\/pos|\/admin\/payments)/, { timeout: 30_000 })
+      break
+    } catch (e) {
+      if (attempt === 2) throw e
+      if (!page.url().includes('/login')) break
+    }
+  }
   await expect(page.getByRole('button', { name: 'Logout' })).toBeVisible({ timeout: 20_000 })
 }
 
