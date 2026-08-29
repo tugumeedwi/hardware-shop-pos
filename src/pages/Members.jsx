@@ -49,13 +49,13 @@ export default function Members() {
     const t = setTimeout(fetchMembers, 0)
     const b = setTimeout(fetchBranches, 0)
     return () => clearTimeout(t), clearTimeout(b)
-  }, [tenant?.id])
+  }, [tenant?.id, fetchMembers, fetchBranches])
 
   useEffect(() => {
     const handler = () => fetchMembers()
     window.addEventListener('syncCompleted', handler)
     return () => window.removeEventListener('syncCompleted', handler)
-  }, [])
+  }, [fetchMembers])
 
   if (!tenant?.id) return null
 

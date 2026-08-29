@@ -30,6 +30,8 @@
     verify_jwt = true
   [functions.list-pending-payment-requests]
     verify_jwt = true
+  [functions.public-api]
+    verify_jwt = false        # Public API endpoint, uses API key auth
 
 [auth]
 site_url = "https://saleshub-pos.netlify.app"

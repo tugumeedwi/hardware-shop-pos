@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { BranchProvider } from './context/BranchContext'
 import Layout from './components/Layout'
+import Reports from './pages/Reports'
 import TenantSelector from './components/TenantSelector'
 import { processSyncQueue } from './utils/syncManager'
 
@@ -188,6 +189,7 @@ function AppInner() {
             <Route path="/users" element={<PrivateRoute roleRequired="owner"><UserManagement /></PrivateRoute>} />
             <Route path="/settings" element={<PrivateRoute roleRequired="owner"><Settings /></PrivateRoute>} />
             <Route path="/settings/receipt" element={<PrivateRoute roleRequired="owner"><ReceiptSettings /></PrivateRoute>} />
+            <Route path="/reports" element={<PrivateRoute roleRequired="owner"><Reports /></PrivateRoute>} />
             <Route path="/tax-settings" element={<PrivateRoute roleRequired="owner"><TaxSettings /></PrivateRoute>} />
             <Route path="/payments" element={<PrivateRoute><Payments /></PrivateRoute>} />
             <Route path="/pricing" element={<PrivateRoute roleRequired="owner"><Pricing /></PrivateRoute>} />

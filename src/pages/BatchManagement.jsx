@@ -8,8 +8,7 @@ const inputClass = 'border border-border-dark rounded-xl px-4 py-2.5 bg-card foc
 
 export default function BatchManagement() {
   const { tenant } = useAuth()
-  const isMultiBranch = false
-  const [products, setProducts] = useState([])
+    const [products, setProducts] = useState([])
   const [batches, setBatches] = useState([])
   const [productId, setProductId] = useState('')
   const [batchNumber, setBatchNumber] = useState('')
@@ -34,30 +33,90 @@ export default function BatchManagement() {
   }
 
   const fetchBatches = async (pid) => {
-    if (!tenant?.id || !currentBranch?.id) return
-    const { data, error } = await supabase
-      .from('product_batches')
-      .select('*')
-      .eq('product_id', pid)
-      .eq('branch_id', currentBranch.id)
+    if (!tenant?.id) return
+    try {
+      const { data, error } = await supabase
+        .from('product_batches')
+        .select('*')
+        .eq('product_id', pid)
+        .eq('branch_id', currentBranch?.id || null)
 
-    if (error) {
-      console.error('Fetch batches error:', error)
+      if (error) {
+        console.error('Fetch batches error:', error)
+        return toast.error('Failed to load batches')
+      }
+      setBatches(data || [])
+    } catch (err) {
+      console.error('Failed to fetch batches:', err)
       return toast.error('Failed to load batches')
     }
-    setBatches(data || [])
+  }
+
+  const handleBatchSubmit = async (e, pid) => {
+    e.preventDefault()
+    const bn = batchNumber.trim()
+    const lot = lotNumber.trim()
+    const exp = expiryDate.trim()
+    const qty = Number(batchQuantity)
+
+    if (!bn || !exp || !qty || qty <= 0) {
+      return toast.error('Fill in all fields (batch number, expiry date, quantity)')
+    }
+
+    try {
+      const { error } = await supabase
+        .from('product_batches')
+        .insert({
+          tenant_id: tenant.id,
+          branch_id: currentBranch?.id || null,
+          product_id: pid,
+          batch_number: bn,
+          lot_number: lot,
+          expiry_date: exp,
+          quantity: qty,
+        })
+
+      if (error) throw error
+
+      toast.success('Batch added')
+      setBatchNumber('')
+      setLotNumber('')
+      setExpiryDate('')
+      setBatchQuantity(0)
+      fetchBatches(pid)
+    } catch (err) {
+      console.error('Add batch error:', err)
+      toast.error('Failed to add batch')
+    }
+  }
+
+  const handleBatchDelete = async (bid) => {
+    if (!confirm('Delete this batch?')) return
+    try {
+      const { error } = await supabase
+        .from('product_batches')
+        .delete()
+        .eq('id', bid)
+
+      if (error) throw error
+      toast.success('Batch deleted')
+      fetchBatches(productId)
+    } catch (err) {
+      console.error('Delete batch error:', err)
+      toast.error('Failed to delete batch')
+    }
   }
 
   useEffect(() => {
     const t = setTimeout(fetchProducts, 0)
     return () => clearTimeout(t)
-  }, [tenant?.id])
+  }, [tenant?.id, fetchProducts])
 
   useEffect(() => {
     if (!productId) return
     const fetchB = setTimeout(fetchBatches, 0)
     return () => clearTimeout(fetchB)
-  }, [productId, currentBranch?.id])
+  }, [productId, currentBranch?.id, fetchBatches])
 
   if (!tenant?.id) return null
 
@@ -68,20 +127,14 @@ export default function BatchManagement() {
       {/* Product selector */}
       <div className="bg-card border border-border rounded-2xl shadow-sm mb-6">
         <div className="px-6 py-4">
-          <h2 className="text-lg font-semibold text-heading">Select Product</h2>
-          <select
-            onChange={(e) => {
-              setProductId(e.target.value)
-              setBatchNumber('')
-              setLotNumber('')
-              setExpiryDate('')
-              setBatchQuantity(0)
-              fetchBatches(e.target.value)
-            }}
-            className="w-full rounded-md border border-border-dark px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-          >
-            <option value="">— Select a product —</option>
-            {products.map((p) => (
+
+          <h2 className="text-heading mb-4">Product selector</h2>
+
+          <p className="text-subtext">Select a product to manage batches:</p>
+
+          <select onChange={(e) => setProductId(e.target.value)}>
+            <option value="">Select a product</option>
+            {products.map(p => (
               <option key={p.id} value={p.id}>
                 {p.name} {(p.sku ? 'SKU: ' + p.sku : '')}
               </option>
@@ -114,219 +167,74 @@ export default function BatchManagement() {
                   type="text"
                   value={lotNumber}
                   onChange={(e) => setLotNumber(e.target.value)}
-                  placeholder="e.g. LOT-2024-1234"
+                  placeholder="e.g. LOT-001"
                   className={inputClass} />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-text mb-1">Expiry Date</label>
                 <input
-                  type="date"
+                  type="text"
                   value={expiryDate}
                   onChange={(e) => setExpiryDate(e.target.value)}
-                  className={inputClass} required />
+                  placeholder="e.g. 2025-12-31"
+                  className={inputClass} />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-text mb-1">Quantity</label>
+                <label className="block text-sm font-medium text-text mb-1">Batch Quantity</label>
                 <input
                   type="number"
+                  min="0"
                   value={batchQuantity}
-                  onChange={(e) => setBatchQuantity(Number(e.target.value) || 0)}
-                  min="1"
-                  className={inputClass} required />
+                  onChange={(e) => setBatchQuantity(Number(e.target.value))}
+                  className={inputClass} />
               </div>
 
               <div>
-                <span className="text-sm text-text-muted">
-                  Branch: {currentBranch.name || '—'}
-                </span>
-              </div>
-
-              <div className="flex gap-3">
-                <button
-                  type="submit"
-                  className="flex-1 bg-primary hover:bg-primary-hover text-white font-semibold py-2.5 px-6 rounded-xl transition-colors shadow-sm">
-                  {batchNumber ? 'Update Batch' : 'Add Batch'}
+                <button type="submit" className="bg-primary hover:bg-primary-hover text-white font-semibold py-2.5 px-6 rounded-xl transition-colors shadow-sm">
+                  Submit
                 </button>
-                {batchNumber && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setBatchNumber('')
-                      setLotNumber('')
-                      setExpiryDate('')
-                      setBatchQuantity(0)
-                    }}
-                    className="flex-1 bg-border hover:bg-border-dark text-text-strong font-medium py-2.5 px-6 rounded-xl transition-colors"
-                  >
-                    Cancel
-                  </button>
-                )}
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* Existing batches table */}
-      {productId && currentBranch && (
-        <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b border-border">
-            <h2 className="text-lg font-semibold text-heading">
-              Batches for {products.find((p) => p.id === productId)?.name || 'Product'}
-              {currentBranch.name && <span className="text-sm text-text-muted"> · {currentBranch.name}</span>}
-            </h2>
-          </div>
+      <div>
+        <h2 className="text-heading mb-4">Batches</h2>
 
-          {batches.length === 0 ? (
-            <div className="p-8 text-center text-text-muted">
-              No batches yet. Add a new batch above.
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-sm">
-                <thead className="bg-background border-b border-border">
+        {batches.length > 0 && (
+          <div>
+            <table>
+              <thead>
+                <tr>
+                  <th className="text-left">Batch Number</th>
+                  <th className="text-left">Lot Number</th>
+                  <th className="text-left">Expiry Date</th>
+                  <th className="text-left">Quantity</th>
+                  <th className="text-left">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {batches.map((batch) => (
                   <tr>
-                    <th className="px-4 py-3 text-left font-medium text-text">Batch #</th>
-                    <th className="px-4 py-3 text-left font-medium text-text">Lot #</th>
-                    <th className="px-4 py-3 text-left font-medium text-text">Expiry Date</th>
-                    <th className="px-4 py-3 text-right font-medium text-text">Quantity</th>
-                    <th className="px-4 py-3 text-center font-medium text-text">Status</th>
-                    <th className="px-4 py-3 text-center font-medium text-text">Actions</th>
+                    <td>{batch.batch_number}</td>
+                    <td>{batch.lot_number}</td>
+                    <td>{batch.expiry_date}</td>
+                    <td>{batch.quantity}</td>
+                    <td>
+                      <button onClick={() => handleBatchDelete(batch.id)} className="text-red-500">
+                        Delete
+                      </button>
+                    </td>
                   </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {batches.map((b) => {
-                    const expDate = b.expiry_date
-                    const daysUntilExpiry =
-                      expDate
-                        ? Math.ceil(
-                            (new Date(expDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
-                        )
-                        : null
-                    const isExpiringSoon =
-                      daysUntilExpiry !== null && daysUntilExpiry <= 30 && daysUntilExpiry > 0
-                    const statusClass =
-                      isExpiringSoon === true
-                        ? 'bg-primary-soft text-primary-hover border border-primary-light'
-                        : 'text-text-strong'
-                    const statusText = isExpiringSoon
-                      ? `Expires in ${daysUntilExpiry} days`
-                      : b.quantity > 0
-                      ? 'In stock'
-                      : 'Empty'
-
-                    return (
-                      <tr key={b.id} className="hover:bg-background transition-colors">
-                        <td className="px-4 py-3 font-medium text-heading">
-                          {b.batch_number}
-                        </td>
-                        <td className="px-4 py-3">{b.lot_number || '—'}</td>
-                        <td className="px-4 py-3">
-                          {b.expiry_date || '—'}
-                          {isExpiringSoon === true && (
-                            <span className="ml-2 inline-block px-2 py-1 rounded text-xs font-medium bg-primary-soft text-primary-hover">
-                              Expiring soon
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-right">{b.quantity}</td>
-                        <td className="px-4 py-3 text-center">
-                          <span className={statusClass}>{statusText}</span>
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          <button
-                            onClick={() => {
-                              setBatchNumber(b.batch_number)
-                              setLotNumber(b.lot_number || '')
-                              setExpiryDate(b.expiry_date || '')
-                              setBatchQuantity(b.quantity)
-                            }}
-                            className="text-primary hover:text-primary-hover font-medium transition-colors text-sm"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => handleBatchDelete(b.id)}
-                            className="text-error hover:text-error-strong font-medium transition-colors text-sm"
-                          >
-                            Delete
-                          </button>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                  {batches.length > 0 && (
-                    <tfoot>
-                      <tr>
-                        <td colSpan={6} className="px-4 py-4 text-right text-text-muted">
-                          {batches.length} batch{batches.length > 1 ? 's' : ''} displayed
-                        </td>
-                      </tr>
-                    </tfoot>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   )
-}
-
-async function handleBatchSubmit(e, pid) {
-  e.preventDefault()
-  const bn = batchNumber.trim()
-  const lot = lotNumber.trim()
-  const exp = expiryDate.trim()
-  const qty = Number(batchQuantity)
-
-  if (!bn || !exp || !qty || qty <= 0) {
-    return toast.error('Fill in all fields (batch number, expiry date, quantity)')
-  }
-
-  try {
-    const { error } = await supabase
-      .from('product_batches')
-      .insert({
-        tenant_id: tenant.id,
-        branch_id: currentBranch?.id || null,
-        product_id: pid,
-        batch_number: bn,
-        lot_number: lot,
-        expiry_date: exp,
-        quantity: qty,
-      })
-
-    if (error) throw error
-
-    toast.success('Batch added')
-    setBatchNumber('')
-    setLotNumber('')
-    setExpiryDate('')
-    setBatchQuantity(0)
-    fetchBatches(pid)
-  } catch (err) {
-    console.error('Add batch error:', err)
-    toast.error('Failed to add batch')
-  }
-}
-
-async function handleBatchDelete(bid) {
-  if (!confirm('Delete this batch?')) return
-  try {
-    const { error } = await supabase
-      .from('product_batches')
-      .delete()
-      .eq('id', bid)
-
-    if (error) throw error
-    toast.success('Batch deleted')
-    fetchBatches(productId)
-  } catch (err) {
-    console.error('Delete batch error:', err)
-    toast.error('Failed to delete batch')
-  }
 }
