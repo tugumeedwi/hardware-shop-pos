@@ -25,6 +25,7 @@ const TaxSettings = lazy(() => import('./pages/TaxSettings'))
 const Pricing = lazy(() => import('./pages/Pricing'))
 const Payments = lazy(() => import('./pages/Payments'))
 const Members = lazy(() => import('./pages/Members'))
+const BatchManagement = lazy(() => import('./pages/BatchManagement'))
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const Expenses = lazy(() => import('./pages/Expenses'))
 const ActivityLog = lazy(() => import('./pages/ActivityLog'))
@@ -195,6 +196,7 @@ function AppInner() {
             <Route path="/activity" element={<PrivateRoute roleRequired="owner"><ActivityLog /></PrivateRoute>} />
             <Route path="/admin/payments" element={<PrivateRoute roleRequired="platform_admin"><AdminPayments /></PrivateRoute>} />
             <Route path="/members" element={<PrivateRoute roleRequired="owner"><Members /></PrivateRoute>} />
+            <Route path="/batch-management" element={<PrivateRoute roleRequired="owner"><BatchManagement /></PrivateRoute>} />
             <Route path="*" element={<Navigate to={isPlatformAdmin ? '/admin/payments' : '/pos'} />} />
           </Routes>
         </Suspense>

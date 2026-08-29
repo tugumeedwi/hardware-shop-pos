@@ -67,6 +67,7 @@ export default function Sidebar({ open, onClose, isOwner, isPlatformAdmin }) {
         items: [
           { to: '/users', label: 'Users', icon: UserCog },
           { to: '/members', label: 'Members', icon: UserCog },
+          { to: '/batch-management', label: 'Batch Management', icon: Package },
           { to: '/settings', label: 'Settings', icon: Settings },
           { to: '/settings/receipt', label: 'Receipt Settings', icon: Printer },
           { to: '/tax-settings', label: 'Tax Settings', icon: FileCheck },
