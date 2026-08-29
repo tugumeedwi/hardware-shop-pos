@@ -90,6 +90,18 @@ Deno.serve(async (req) => {
     return json({ success: false, error: 'Could not create the shop' }, 500)
   }
 
+  // 1b. Every shop must own at least one branch, because stock is held per
+  //     branch. A database trigger already creates the head office on tenant
+  //     insert; this call is the belt-and-braces assertion and is idempotent -
+  //     ensure_default_branch() returns the existing branch instead of adding a
+  //     second one, so it can never produce a duplicate "Main Branch".
+  const { error: branchError } = await supabase.rpc('ensure_default_branch', {
+    p_tenant: tenant.id
+  })
+  if (branchError) {
+    console.error('[signup-tenant] default branch check failed:', branchError.message)
+  }
+
   // 2. Create the owner user, stamping app_metadata.tenant_id so get_my_tenant()
   //    and RLS work immediately after the first login.
   //    email_confirm: false -> the account is NOT active until the new owner

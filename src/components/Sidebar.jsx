@@ -16,6 +16,9 @@ import {
   FileCheck,
   Printer,
   ShieldCheck,
+  Truck,
+  Store,
+  ArrowLeftRight,
   Plus,
   X,
 } from 'lucide-react'
@@ -46,12 +49,15 @@ export default function Sidebar({ open, onClose, isOwner, isPlatformAdmin }) {
         items: [
           { to: '/products', label: 'Products', icon: Package },
           { to: '/customers', label: 'Customers', icon: Users },
+          { to: '/suppliers', label: 'Suppliers', icon: Truck },
           { to: '/expenses', label: 'Expenses', icon: Wallet },
         ],
       },
       {
         label: 'OPERATIONS',
         items: [
+          { to: '/branches', label: 'Branches', icon: Store },
+          { to: '/stock-transfers', label: 'Stock Transfers', icon: ArrowLeftRight },
           { to: '/conflicts', label: 'Conflicts', icon: AlertTriangle },
           { to: '/activity', label: 'Activity', icon: Activity },
         ],
@@ -60,6 +66,7 @@ export default function Sidebar({ open, onClose, isOwner, isPlatformAdmin }) {
         label: 'ADMINISTRATION',
         items: [
           { to: '/users', label: 'Users', icon: UserCog },
+          { to: '/members', label: 'Members', icon: UserCog },
           { to: '/settings', label: 'Settings', icon: Settings },
           { to: '/settings/receipt', label: 'Receipt Settings', icon: Printer },
           { to: '/tax-settings', label: 'Tax Settings', icon: FileCheck },

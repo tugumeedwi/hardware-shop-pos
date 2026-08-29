@@ -2,8 +2,15 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../api/supabaseClient'
 import Receipt from '../components/Receipt'
 import toast from 'react-hot-toast'
+import { useAuth } from '../context/AuthContext'
+import { logActivity } from '../utils/activityLogger'
+
+const inputClass = 'border border-border-dark rounded-xl px-4 py-2.5 bg-card focus:outline-none focus:ring-2 focus:ring-primary'
 
 export default function SalesHistory() {
+  const { tenant, profile } = useAuth()
+  const isOwner = tenant?.membership_role === 'owner' || profile?.role === 'platform_admin'
+
   const [sales, setSales] = useState([])
   const [loading, setLoading] = useState(true)
   const [viewReceiptId, setViewReceiptId] = useState(null)
@@ -12,6 +19,16 @@ export default function SalesHistory() {
   const [paymentFilter, setPaymentFilter] = useState('all')
   const [customerFilter, setCustomerFilter] = useState('')
   const [totals, setTotals] = useState({ total: 0, cash: 0, mobile_money: 0, credit: 0 })
+
+  // Sale ids that already carry a completed return, for the RETURNED pill.
+  const [returnedIds, setReturnedIds] = useState(() => new Set())
+
+  // Return modal state
+  const [returnSale, setReturnSale] = useState(null)
+  const [returnLines, setReturnLines] = useState([])
+  const [returnLoading, setReturnLoading] = useState(false)
+  const [returnReason, setReturnReason] = useState('')
+  const [submitting, setSubmitting] = useState(false)
 
   const fetchSales = useCallback(async () => {
     setLoading(true)
@@ -43,6 +60,19 @@ export default function SalesHistory() {
     }
     setSales(filtered)
 
+    // One extra query flags which of the listed sales already have a completed
+    // return, so the row can show a RETURNED pill without an N+1 fan-out.
+    const ids = filtered.map(s => s.id)
+    if (ids.length > 0) {
+      const { data: returnRows } = await supabase
+        .from('sales_returns')
+        .select('sale_id, refund_total, status')
+        .in('sale_id', ids)
+      setReturnedIds(new Set((returnRows || []).filter(r => r.status === 'completed').map(r => r.sale_id)))
+    } else {
+      setReturnedIds(new Set())
+    }
+
     // Totals must match what the table actually shows, so compute them on the
     // customer-filtered set (date/payment filters already applied server-side).
     setTotals({
@@ -65,6 +95,139 @@ export default function SalesHistory() {
   }, [fetchSales])
 
   const applyCustomerFilter = () => fetchSales()
+
+  // --- Return flow -----------------------------------------------------------
+  // When the modal opens, load the sale's lines plus everything already
+  // returned against them so each row can cap its own input.
+  useEffect(() => {
+    if (!returnSale) return
+    let cancelled = false
+
+    const loadLines = async () => {
+      setReturnLoading(true)
+      const { data: items, error: itemsError } = await supabase
+        .from('sale_items')
+        .select('*, products(name, tax_rate)')
+        .eq('sale_id', returnSale.id)
+
+      if (cancelled) return
+      if (itemsError) {
+        toast.error(itemsError.message)
+        setReturnLines([])
+        setReturnLoading(false)
+        return
+      }
+
+      const rows = items || []
+      const itemIds = rows.map(it => it.id)
+      const returnedByItem = {}
+
+      if (itemIds.length > 0) {
+        const { data: priorReturns } = await supabase
+          .from('return_items')
+          .select('sale_item_id, quantity_returned, sales_returns!inner(status)')
+          .in('sale_item_id', itemIds)
+
+        for (const r of priorReturns || []) {
+          // A rejected return never consumed any quantity.
+          if (r.sales_returns?.status === 'rejected') continue
+          returnedByItem[r.sale_item_id] = (returnedByItem[r.sale_item_id] || 0) + Number(r.quantity_returned || 0)
+        }
+      }
+
+      if (cancelled) return
+      setReturnLines(rows.map(it => {
+        const sold = Number(it.quantity_sold || 0)
+        const already = returnedByItem[it.id] || 0
+        return {
+          id: it.id,
+          name: it.products?.name || 'Unknown',
+          unit: it.selling_unit,
+          taxRate: Number(it.products?.tax_rate || 0),
+          unitPrice: Number(it.unit_price || 0),
+          lineTotal: Number(it.line_total || 0),
+          sold,
+          already,
+          returnable: Math.max(0, sold - already),
+          qty: ''
+        }
+      }))
+      setReturnLoading(false)
+    }
+
+    loadLines()
+    return () => { cancelled = true }
+  }, [returnSale])
+
+  const openReturn = (s) => {
+    setReturnSale(s)
+    setReturnLines([])
+    setReturnReason('')
+  }
+
+  const closeReturn = () => {
+    setReturnSale(null)
+    setReturnLines([])
+    setReturnReason('')
+  }
+
+  const setLineQty = (id, raw) => {
+    setReturnLines(prev => prev.map(l => {
+      if (l.id !== id) return l
+      if (raw === '') return { ...l, qty: '' }
+      const n = Number(raw)
+      if (Number.isNaN(n)) return l
+      // Cap at what is actually returnable so the estimate can never lie.
+      return { ...l, qty: String(Math.min(Math.max(0, n), l.returnable)) }
+    }))
+  }
+
+  // Pre-discount subtotal of the whole sale, the denominator the server uses to
+  // apportion the sale-level discount across returned lines.
+  const saleSubtotal = returnLines.reduce((sum, l) => sum + l.lineTotal, 0)
+  const discountTotal = Number(returnSale?.discount_total || 0)
+
+  const lineRefund = (l) => {
+    const qty = Number(l.qty) || 0
+    if (qty <= 0) return 0
+    const base = qty * l.unitPrice
+    const tax = base * l.taxRate / 100
+    const discount = saleSubtotal > 0 ? discountTotal * (base / saleSubtotal) : 0
+    return Math.max(0, base + tax - discount)
+  }
+
+  const estimatedRefund = returnLines.reduce((sum, l) => sum + lineRefund(l), 0)
+  const hasQty = returnLines.some(l => Number(l.qty) > 0)
+
+  const submitReturn = async () => {
+    if (!returnSale || !hasQty) return
+    setSubmitting(true)
+    try {
+      const reason = returnReason.trim()
+      const { data: returnId, error } = await supabase.rpc('create_sales_return', {
+        return_data: {
+          sale_id: returnSale.id,
+          reason: reason || null,
+          items: returnLines
+            .filter(l => Number(l.qty) > 0)
+            .map(l => ({ sale_item_id: l.id, quantity_returned: Number(l.qty) }))
+        }
+      })
+
+      if (error) {
+        // Server messages are written for end users, so show them verbatim.
+        toast.error(error.message)
+        return
+      }
+
+      await logActivity('create_sales_return', 'sale', returnSale.id, { return_id: returnId, reason })
+      toast.success('Return recorded')
+      closeReturn()
+      fetchSales()
+    } finally {
+      setSubmitting(false)
+    }
+  }
 
   const csvEscape = (value) => {
     const str = String(value ?? '')
@@ -161,7 +324,7 @@ export default function SalesHistory() {
                 <th className="px-4 py-3 text-left font-medium text-text">Customer</th>
                 <th className="px-4 py-3 text-left font-medium text-text">Payment</th>
                 <th className="px-4 py-3 text-right font-medium text-text">Total</th>
-                <th className="px-4 py-3 text-center font-medium text-text">Receipt</th>
+                <th className="px-4 py-3 text-center font-medium text-text">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -170,9 +333,19 @@ export default function SalesHistory() {
                   <td className="px-4 py-3 text-text-strong">{new Date(s.created_at).toLocaleString()}</td>
                   <td className="px-4 py-3 font-medium text-heading">{s.customers?.name || 'Walk-in'}</td>
                   <td className="px-4 py-3 text-text capitalize">{s.payment_method?.replace('_', ' ')}</td>
-                  <td className="px-4 py-3 text-right text-text-strong">{s.total_amount.toFixed(2)}</td>
+                  <td className="px-4 py-3 text-right text-text-strong">
+                    <span className="inline-flex items-center gap-2 justify-end">
+                      {returnedIds.has(s.id) && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-warning-soft text-warning-strong">RETURNED</span>
+                      )}
+                      {s.total_amount.toFixed(2)}
+                    </span>
+                  </td>
                   <td className="px-4 py-3 text-center">
                     <button onClick={() => setViewReceiptId(s.id)} className="text-primary hover:text-primary-hover font-medium transition-colors">View</button>
+                    {isOwner && s.status === 'completed' && (
+                      <button onClick={() => openReturn(s)} className="text-warning-strong hover:text-error-strong font-medium ml-3 transition-colors">Return</button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -187,6 +360,92 @@ export default function SalesHistory() {
       <button onClick={exportCSV} className="bg-border hover:bg-border-dark text-text-strong font-medium py-2.5 px-5 rounded-xl transition-colors">
         Export CSV
       </button>
+
+      {returnSale && (
+        <div className="fixed inset-0 z-50 bg-sidebar/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-card rounded-2xl shadow-2xl p-5 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-heading">Return Items</h3>
+              <button onClick={closeReturn} className="text-text-muted hover:text-text text-xl leading-none">✕</button>
+            </div>
+
+            <p className="text-xs text-text-muted mb-4">
+              Sale {returnSale.id.slice(0, 8)} · {new Date(returnSale.created_at).toLocaleString()} · {returnSale.customers?.name || 'Walk-in'}
+            </p>
+
+            {returnLoading ? (
+              <p className="text-sm text-text-muted py-6 text-center">Loading items…</p>
+            ) : returnLines.length === 0 ? (
+              <p className="text-sm text-text-muted py-6 text-center">No items found on this sale.</p>
+            ) : (
+              <div className="overflow-x-auto border border-border rounded-xl mb-4">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-background border-b border-border">
+                    <tr>
+                      <th className="px-3 py-2 text-left font-medium text-text">Product</th>
+                      <th className="px-3 py-2 text-left font-medium text-text">Unit</th>
+                      <th className="px-3 py-2 text-right font-medium text-text">Sold</th>
+                      <th className="px-3 py-2 text-right font-medium text-text">Already returned</th>
+                      <th className="px-3 py-2 text-right font-medium text-text">Returnable</th>
+                      <th className="px-3 py-2 text-center font-medium text-text">Return qty</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {returnLines.map(l => (
+                      <tr key={l.id} className={l.returnable <= 0 ? 'opacity-60' : ''}>
+                        <td className="px-3 py-2 font-medium text-heading">{l.name}</td>
+                        <td className="px-3 py-2 text-text capitalize">{l.unit}</td>
+                        <td className="px-3 py-2 text-right text-text-strong">{l.sold}</td>
+                        <td className="px-3 py-2 text-right text-text-strong">{l.already}</td>
+                        <td className="px-3 py-2 text-right text-text-strong">{l.returnable}</td>
+                        <td className="px-3 py-2 text-center">
+                          {l.returnable <= 0 ? (
+                            <span className="inline-flex items-center gap-2">
+                              <input type="number" min="0" step="0.01" max={l.returnable} value={0} disabled
+                                className="w-20 border border-border-dark rounded-lg px-2 py-1 bg-card focus:outline-none focus:ring-1 focus:ring-primary" />
+                              <span className="text-xs text-text-muted">Fully returned</span>
+                            </span>
+                          ) : (
+                            <input type="number" min="0" step="0.01" max={l.returnable} value={l.qty}
+                              onChange={(e) => setLineQty(l.id, e.target.value)}
+                              className="w-20 border border-border-dark rounded-lg px-2 py-1 bg-card focus:outline-none focus:ring-1 focus:ring-primary" />
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            <div className="mb-4">
+              <label className="text-xs font-medium text-text">Reason</label>
+              <textarea rows={2} value={returnReason} onChange={(e) => setReturnReason(e.target.value)}
+                placeholder="Why is this being returned?" className={inputClass + ' w-full'} />
+            </div>
+
+            <div className="bg-background border border-border rounded-xl p-4 mb-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-text">Estimated refund</span>
+                <span className="text-lg font-bold text-heading">{estimatedRefund.toFixed(2)}</span>
+              </div>
+              <p className="text-xs text-text-muted mt-1">
+                Includes tax and a proportional share of the sale discount. The server calculates the final figure.
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-3">
+              <button onClick={closeReturn} className="bg-border hover:bg-border-dark text-text-strong font-medium py-2.5 px-6 rounded-xl transition-colors">
+                Cancel
+              </button>
+              <button onClick={submitReturn} disabled={submitting || !hasQty}
+                className="bg-primary hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-2.5 px-6 rounded-xl transition-colors shadow-sm">
+                {submitting ? 'Processing...' : 'Confirm Return'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {viewReceiptId && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm">

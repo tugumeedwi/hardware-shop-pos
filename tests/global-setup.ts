@@ -124,6 +124,7 @@ export default async function globalSetup() {
     offline: { tenant_id: '', tenant_name: '', cashier: null as any, bolt: null as any },
     receipt: { tenant_id: '', tenant_name: '', owner: null as any, wire: null as any },
     payment: { tenant_id: '', tenant_name: '', owner: null as any },
+    phase1: { tenant_id: '', tenant_name: '', owner: null as any, cashier: null as any, widget: null as any, gadget: null as any },
     platformAdmin: null as any
   }
 
@@ -299,6 +300,39 @@ export default async function globalSetup() {
   data.payment.owner = { email: email('pay-owner'), password, user_id: '' }
   data.payment.owner.user_id = await createUser(svc, data.payment.owner.email, password, data.payment.tenant_id, 'owner', 'QA Payment Owner')
 
+  // ---- Phase 1 tenant: branches / suppliers / stock transfers / returns ----
+  // Seeded exactly like the hardware tenant (plain INSERT, so the DB trigger
+  // gives it a 'Main Branch' head office) but with its own products, so the
+  // branch and return specs can move stock around without touching the stock
+  // figures the other specs assert on.
+  const p1Name = `QA Phase1 Shop ${runId}`
+  data.phase1.tenant_id = await createTenant(svc, p1Name, 'hardware')
+  data.phase1.tenant_name = p1Name
+  data.phase1.owner = { email: email('p1-owner'), password, user_id: '' }
+  data.phase1.cashier = { email: email('p1-cashier'), password, user_id: '' }
+  data.phase1.owner.user_id = await createUser(svc, data.phase1.owner.email, password, data.phase1.tenant_id, 'owner', 'QA Phase1 Owner')
+  data.phase1.cashier.user_id = await createUser(svc, data.phase1.cashier.email, password, data.phase1.tenant_id, 'cashier', 'QA Phase1 Cashier')
+  data.phase1.widget = {
+    id: '',
+    name: `QA Branch Widget ${runId}`,
+    sku: `QA-WIDGET-${runId}`,
+    category: 'hardware',
+    stock: 100,
+    price: { piece: 5000 },
+    active_pricing_methods: ['piece']
+  }
+  data.phase1.widget.id = await createProduct(svc, data.phase1.tenant_id, data.phase1.widget)
+  data.phase1.gadget = {
+    id: '',
+    name: `QA Branch Gadget ${runId}`,
+    sku: `QA-GADGET-${runId}`,
+    category: 'hardware',
+    stock: 40,
+    price: { piece: 2000 },
+    active_pricing_methods: ['piece']
+  }
+  data.phase1.gadget.id = await createProduct(svc, data.phase1.tenant_id, data.phase1.gadget)
+
   // ---- Dedicated platform admin ----
   data.platformAdmin = { email: email('platform-admin'), password, user_id: '' }
   data.platformAdmin.user_id = await createUser(svc, data.platformAdmin.email, password, null, 'platform_admin', 'QA Platform Admin')
@@ -314,5 +348,5 @@ export default async function globalSetup() {
 
   writeTestData(data)
   console.log(`[global-setup] created ${JSON.stringify(TEST_DATA_PATH)} runId=${runId}`)
-  console.log(`[global-setup] tenants: ${[hwName, phName, smName, offName, rcName, payName].join(', ')}`)
+  console.log(`[global-setup] tenants: ${[hwName, phName, smName, offName, rcName, payName, p1Name].join(', ')}`)
 }

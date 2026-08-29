@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, Component } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
+import { BranchProvider } from './context/BranchContext'
 import Layout from './components/Layout'
 import TenantSelector from './components/TenantSelector'
 import { processSyncQueue } from './utils/syncManager'
@@ -23,10 +24,14 @@ const ReceiptSettings = lazy(() => import('./pages/ReceiptSettings'))
 const TaxSettings = lazy(() => import('./pages/TaxSettings'))
 const Pricing = lazy(() => import('./pages/Pricing'))
 const Payments = lazy(() => import('./pages/Payments'))
+const Members = lazy(() => import('./pages/Members'))
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const Expenses = lazy(() => import('./pages/Expenses'))
 const ActivityLog = lazy(() => import('./pages/ActivityLog'))
 const AdminPayments = lazy(() => import('./pages/AdminPayments'))
+const Suppliers = lazy(() => import('./pages/Suppliers'))
+const Branches = lazy(() => import('./pages/Branches'))
+const StockTransfer = lazy(() => import('./pages/StockTransfer'))
 
 function PageFallback() {
   return (
@@ -172,6 +177,9 @@ function AppInner() {
             <Route path="/pos" element={<PrivateRoute><POS /></PrivateRoute>} />
             <Route path="/products" element={<PrivateRoute roleRequired="owner"><Products /></PrivateRoute>} />
             <Route path="/customers" element={<PrivateRoute roleRequired="owner"><Customers /></PrivateRoute>} />
+            <Route path="/suppliers" element={<PrivateRoute roleRequired="owner"><Suppliers /></PrivateRoute>} />
+            <Route path="/branches" element={<PrivateRoute roleRequired="owner"><Branches /></PrivateRoute>} />
+            <Route path="/stock-transfers" element={<PrivateRoute roleRequired="owner"><StockTransfer /></PrivateRoute>} />
             <Route path="/quotations" element={<PrivateRoute><Quotations /></PrivateRoute>} />
             <Route path="/quotations/new" element={<PrivateRoute><QuotationForm /></PrivateRoute>} />
             <Route path="/sales" element={<PrivateRoute><SalesHistory /></PrivateRoute>} />
@@ -186,6 +194,7 @@ function AppInner() {
             <Route path="/expenses" element={<PrivateRoute roleRequired="owner"><Expenses /></PrivateRoute>} />
             <Route path="/activity" element={<PrivateRoute roleRequired="owner"><ActivityLog /></PrivateRoute>} />
             <Route path="/admin/payments" element={<PrivateRoute roleRequired="platform_admin"><AdminPayments /></PrivateRoute>} />
+            <Route path="/members" element={<PrivateRoute roleRequired="owner"><Members /></PrivateRoute>} />
             <Route path="*" element={<Navigate to={isPlatformAdmin ? '/admin/payments' : '/pos'} />} />
           </Routes>
         </Suspense>
@@ -197,9 +206,11 @@ function AppInner() {
 export default function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <AppInner />
-      </BrowserRouter>
+      <BranchProvider>
+        <BrowserRouter>
+          <AppInner />
+        </BrowserRouter>
+      </BranchProvider>
     </AuthProvider>
   )
 }

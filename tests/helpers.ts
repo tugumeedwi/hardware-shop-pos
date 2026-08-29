@@ -57,6 +57,10 @@ export interface TestData {
   offline: TenantSeed & { cashier: UserSeed; bolt: ProductSeed }
   receipt: TenantSeed & { owner: UserSeed; wire: ProductSeed }
   payment: TenantSeed & { owner: UserSeed }
+  // Dedicated tenant for the Phase 1 branch / supplier / return coverage. It
+  // owns its own products so those specs can move stock between branches
+  // without disturbing the figures the other specs assert on.
+  phase1: TenantSeed & { owner: UserSeed; cashier: UserSeed; widget: ProductSeed; gadget: ProductSeed }
   platformAdmin: UserSeed
 }
 

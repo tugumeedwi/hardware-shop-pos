@@ -75,4 +75,17 @@ db.version(7).stores({
   memberships: 'tenant_id, role'
 });
 
+db.version(8).stores({
+  products: 'id, name, sku, barcode, category, is_tile, stock_quantity, price_per_piece, price_per_box, price_per_sqm, price_per_kg, active_pricing_methods, pieces_per_box, m2_per_piece, pieces_per_kg, attributes, is_deleted, tax_rate, brand, supplier, supplier_id',
+  customers: 'id, name, phone',
+  pendingSales: '++localId, saleData.offline_created_at, status',
+  syncQueue: '++id, tableName, recordId, operation, timestamp, attempts, nextRetryAt',
+  memberships: 'tenant_id, role',
+
+  // Cached branches so an offline cashier can still stamp branch_id onto a
+  // queued sale; without this a sale made offline would have to be attributed
+  // to the tenant default at sync time instead of the till it was rung on.
+  branches: 'id, tenant_id, name, is_head_office'
+});
+
 export default db;

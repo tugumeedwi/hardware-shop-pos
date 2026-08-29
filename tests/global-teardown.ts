@@ -6,12 +6,26 @@ import 'dotenv/config'
 // Removes every tenant, user and product created by global-setup.ts for this
 // run. Deleting tenants cascades tenant_memberships and payment_requests; we
 // still delete child rows explicitly first so FK constraints never block it.
+//
+// NOTE: 'branches' is deliberately absent. trg_branches_guard_delete raises
+// 'Cannot delete the only branch of a shop' while the tenant still exists, so
+// an explicit branches delete would fail every run. Branches (and their
+// branch_stock rows) disappear with the tenant cascade.
 // ---------------------------------------------------------------------------
 
 const CHILD_TABLES = [
   'payment_requests',
   'tax_invoices',
   'credit_transactions',
+  // Phase 1 children first: return_items -> sale_items and
+  // stock_transfer_items -> products are plain FKs with no cascade, so they
+  // must go before their parents below.
+  'return_items',
+  'sales_returns',
+  'stock_transfer_items',
+  'stock_transfers',
+  'branch_stock',
+  'suppliers',
   'sale_items',
   'sales',
   'products',
@@ -36,7 +50,8 @@ export default async function globalTeardown() {
     data.supermarket?.tenant_id,
     data.offline?.tenant_id,
     data.receipt?.tenant_id,
-    data.payment?.tenant_id
+    data.payment?.tenant_id,
+    data.phase1?.tenant_id
   ].filter(Boolean)
 
   const userIds = [
@@ -49,6 +64,8 @@ export default async function globalTeardown() {
     data.offline?.cashier?.user_id,
     data.receipt?.owner?.user_id,
     data.payment?.owner?.user_id,
+    data.phase1?.owner?.user_id,
+    data.phase1?.cashier?.user_id,
     data.platformAdmin?.user_id
   ].filter(Boolean)
 

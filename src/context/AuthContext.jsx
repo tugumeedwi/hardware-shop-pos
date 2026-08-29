@@ -87,7 +87,7 @@ export function AuthProvider({ children }) {
   async function fetchMemberships(user) {
     const { data, error } = await supabase
       .from('tenant_memberships')
-      .select('tenant_id, role, tenants!inner(id, name, industry, business_rules, business_type, subscription_status, subscription_end_date, tax_enabled, receipt_logo_url, receipt_business_name, receipt_footer_text, receipt_accent_color, receipt_show_tax, receipt_template)')
+      .select('tenant_id, role, branch_id, tenants!inner(id, name, industry, business_rules, business_type, subscription_status, subscription_end_date, tax_enabled, receipt_logo_url, receipt_business_name, receipt_footer_text, receipt_accent_color, receipt_show_tax, receipt_template)')
       .eq('user_id', user?.id)
 
     if (error) {
@@ -119,6 +119,9 @@ export function AuthProvider({ children }) {
         memberships.map(m => ({
           tenant_id: m.tenant_id,
           role: m.role,
+          // Cached so an offline cashier's queued sale is still attributed to
+          // the branch they are assigned to rather than the tenant default.
+          branch_id: m.branch_id || null,
           tenants: m.tenants
         }))
       )
@@ -133,6 +136,7 @@ export function AuthProvider({ children }) {
       return rows.map(m => ({
         tenant_id: m.tenant_id,
         role: m.role,
+        branch_id: m.branch_id || null,
         tenants: {
           id: m.tenant_id,
           name: m.tenants?.name || null,

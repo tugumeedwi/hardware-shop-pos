@@ -5,6 +5,7 @@ import toast from 'react-hot-toast'
 import { useRealtimeSubscription } from '../hooks/useRealtime'
 import { logActivity } from '../utils/activityLogger'
 import { useAuth } from '../context/AuthContext'
+import { useBranch } from '../context/BranchContext'
 
 const PHONE_ATTR_FIELDS = [
   { key: 'imei', label: 'IMEI (15‑17 digits)' },
@@ -25,6 +26,7 @@ const baseForm = (isHardware, isSupermarket) => ({
   barcode: '',
   brand: '',
   supplier: '',
+  supplier_id: '',
   tax_rate: 0,
   is_tile: false,
   stock_quantity: 0,
@@ -56,6 +58,7 @@ const Field = ({ label, required, children }) => (
 
 export default function Products() {
   const { tenant } = useAuth()
+  const { branches, currentBranch, currentBranchId, setCurrentBranch, canSwitchBranch, isMultiBranch } = useBranch()
   const businessType = tenant?.business_type || 'hardware'
   const isHardware = businessType === 'hardware'
   const isPhone = businessType === 'phones'
@@ -68,6 +71,11 @@ export default function Products() {
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState(() => baseForm(isHardware, isSupermarket))
   const [importing, setImporting] = useState(false)
+  const [suppliers, setSuppliers] = useState([])
+  // Per-branch stock for the branch being inspected. The Stock column always
+  // shows the tenant-wide total; this adds a second column so an owner can see
+  // how that total is distributed.
+  const [branchStock, setBranchStock] = useState({})
 
   const fetchProducts = async () => {
     const { data } = await supabase.from('products').select('*').eq('is_deleted', false).order('name')
@@ -75,10 +83,36 @@ export default function Products() {
     setLoading(false)
   }
 
+  const fetchSuppliers = async () => {
+    const { data } = await supabase.from('suppliers').select('id, name').order('name')
+    setSuppliers(data || [])
+  }
+
   useEffect(() => {
     const t = setTimeout(fetchProducts, 0)
     return () => clearTimeout(t)
   }, [])
+  useEffect(() => {
+    const t = setTimeout(fetchSuppliers, 0)
+    return () => clearTimeout(t)
+  }, [])
+  useEffect(() => {
+    let cancelled = false
+    const load = async () => {
+      if (!currentBranchId) {
+        if (!cancelled) setBranchStock({})
+        return
+      }
+      const { data } = await supabase
+        .from('branch_stock')
+        .select('product_id, stock_quantity')
+        .eq('branch_id', currentBranchId)
+      if (cancelled) return
+      setBranchStock(Object.fromEntries((data || []).map(r => [r.product_id, r.stock_quantity])))
+    }
+    const t = setTimeout(load, 0)
+    return () => { cancelled = true; clearTimeout(t) }
+  }, [currentBranchId, products])
   useEffect(() => {
     const handler = () => fetchProducts()
     window.addEventListener('syncCompleted', handler)
@@ -101,6 +135,7 @@ export default function Products() {
       barcode: product.barcode || '',
       brand: product.brand || '',
       supplier: product.supplier || '',
+      supplier_id: product.supplier_id || '',
       tax_rate: product.tax_rate || 0,
       is_tile: product.is_tile,
       stock_quantity: product.stock_quantity,
@@ -181,13 +216,18 @@ export default function Products() {
   const buildPayload = () => {
     const attributes = buildAttributes()
     const attrsKeyCount = Object.keys(attributes).length
+    // supplier_id is the authoritative link; the legacy free-text supplier
+    // column is kept in step with the chosen name so receipts, CSV exports and
+    // the offline mirror keep showing something useful.
+    const chosenSupplier = suppliers.find(s => s.id === form.supplier_id)
     return {
       name: form.name.trim(),
       category: form.category || null,
       sku: form.sku || null,
       barcode: form.barcode ? String(form.barcode).trim() : null,
       brand: form.brand ? String(form.brand).trim() : null,
-      supplier: form.supplier ? String(form.supplier).trim() : null,
+      supplier: chosenSupplier ? chosenSupplier.name : (form.supplier ? String(form.supplier).trim() : null),
+      supplier_id: form.supplier_id || null,
       tax_rate: parseFloat(form.tax_rate) || 0,
       is_tile: isPieceOnly ? false : form.is_tile,
       stock_quantity: form.stock_quantity,
@@ -395,14 +435,19 @@ export default function Products() {
               <Field label="Brand">
                 <input type="text" placeholder="e.g. Britannia, Sasco" value={form.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })} className={inputClass + ' w-full'} />
               </Field>
-              <Field label="Supplier">
-                <input type="text" placeholder="e.g. Metro Distributors" value={form.supplier} onChange={(e) => setForm({ ...form, supplier: e.target.value })} className={inputClass + ' w-full'} />
-              </Field>
               <Field label="Tax Rate (%)">
                 <input type="number" step="0.01" min="0" value={form.tax_rate} onChange={(e) => setForm({ ...form, tax_rate: e.target.value })} className={inputClass + ' w-full'} />
               </Field>
             </>
           )}
+          {/* Supplier is optional and shared by every vertical. The list is
+              maintained on the Suppliers page. */}
+          <Field label="Supplier">
+            <select value={form.supplier_id} onChange={(e) => setForm({ ...form, supplier_id: e.target.value })} className={inputClass + ' w-full'}>
+              <option value="">No supplier</option>
+              {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          </Field>
           {!isSupermarket && (
             <Field label={isPhone ? 'SKU (optional)' : 'SKU / Barcode'}>
               <input type="text" placeholder={isPhone ? 'Internal code for this phone' : 'Scannable barcode / SKU'} value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} className={inputClass + ' w-full'} />
@@ -594,6 +639,36 @@ export default function Products() {
         </div>
       </form>
 
+      {/* Branch stock inspector. The catalogue itself is tenant-wide; this only
+          picks which branch's share of the stock is shown next to the total.
+          Hidden entirely for single-branch shops. */}
+      {isMultiBranch && currentBranch && (
+        <div className="flex items-center gap-3 flex-wrap mb-3">
+          <span className="text-sm font-medium text-text">Show stock at</span>
+          {canSwitchBranch ? (
+            <select
+              value={currentBranchId || ''}
+              aria-label="Branch stock view"
+              onChange={(e) => setCurrentBranch(e.target.value)}
+              className="border border-border-dark rounded-lg px-3 py-1.5 text-sm bg-card focus:outline-none focus:ring-1 focus:ring-primary text-heading font-medium"
+            >
+              {branches.map(b => (
+                <option key={b.id} value={b.id}>
+                  {b.name}{b.is_head_office ? ' (Head office)' : ''}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-primary-soft text-primary-hover border border-primary-light">
+              {currentBranch.name}
+            </span>
+          )}
+          <span className="text-xs text-text-muted">
+            Stock added here lands at the head office – move it with a stock transfer.
+          </span>
+        </div>
+      )}
+
       {/* Product table */}
       <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
@@ -604,6 +679,9 @@ export default function Products() {
                 <th className="px-4 py-3 text-left font-medium text-text">Category</th>
                 <th className="px-4 py-3 text-left font-medium text-text">{isSupermarket ? 'Barcode' : 'SKU'}</th>
                 <th className="px-4 py-3 text-center font-medium text-text">Stock</th>
+                {isMultiBranch && currentBranch && (
+                  <th className="px-4 py-3 text-center font-medium text-text">At {currentBranch.name}</th>
+                )}
                 <th className="px-4 py-3 text-center font-medium text-text">Type</th>
                 <th className="px-4 py-3 text-center font-medium text-text">Methods</th>
                 <th className="px-4 py-3 text-center font-medium text-text">Actions</th>
@@ -628,6 +706,9 @@ export default function Products() {
                       )}
                     </span>
                   </td>
+                  {isMultiBranch && currentBranch && (
+                    <td className="px-4 py-3 text-center text-text">{branchStock[product.id] ?? 0}</td>
+                  )}
                   <td className="px-4 py-3 text-center text-text">{productTypeLabel(product)}</td>
                   <td className="px-4 py-3 text-center text-text">{(product.active_pricing_methods || []).join(', ')}</td>
                   <td className="px-4 py-3 text-center">
@@ -637,7 +718,7 @@ export default function Products() {
                 </tr>
               ))}
               {products.length === 0 && (
-                <tr><td colSpan={7} className="px-4 py-8 text-center text-text-muted">No products found.</td></tr>
+                <tr><td colSpan={isMultiBranch && currentBranch ? 8 : 7} className="px-4 py-8 text-center text-text-muted">No products found.</td></tr>
               )}
             </tbody>
           </table>

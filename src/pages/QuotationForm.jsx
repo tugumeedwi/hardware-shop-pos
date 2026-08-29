@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../api/supabaseClient'
 import { useAuth } from '../context/AuthContext'
+import { useBranch } from '../context/BranchContext'
 import { useOnlineStatus } from '../hooks/useOnlineStatus'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
@@ -9,6 +10,7 @@ import db from '../db/localDatabase'
 
 export default function QuotationForm() {
   const { profile } = useAuth()
+  const { currentBranchId } = useBranch()
   const { isOnline } = useOnlineStatus()
   const navigate = useNavigate()
   const [products, setProducts] = useState([])
@@ -138,6 +140,7 @@ export default function QuotationForm() {
       customer_id: selectedCustomer.id,
       type: 'quotation',
       status: 'pending',
+      branch_id: currentBranchId || null,
       payment_method: null,
       discount_total: parseFloat(discount) || 0,
       total_amount: totalAfterDiscount,

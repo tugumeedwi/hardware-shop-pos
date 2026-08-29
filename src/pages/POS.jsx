@@ -9,14 +9,31 @@ import { useRealtimeSubscription } from '../hooks/useRealtime'
 import { useOnlineStatus } from '../hooks/useOnlineStatus'
 import { normalisePhone } from '../utils/phoneUtils'
 import { queueTaxInvoiceAfterSale } from '../utils/syncManager'
-import { Scale } from 'lucide-react'
+import { useBranch } from '../context/BranchContext'
+import { Scale, Store } from 'lucide-react'
 
 // Upper bound for a single scale reading. Retail counter scales top out far
 // below this, so anything larger is a mis-read rather than a real weight.
 const MAX_WEIGHT_KG = 999
 
+// Stock is held per branch, while the catalogue row carries the tenant-wide
+// total. The till overlays the selling branch's ledger so a cashier sees what
+// this shop can actually sell instead of finding out at checkout. A product with
+// no ledger row at this branch reads as zero.
+async function applyBranchStock(rows, branchId) {
+  if (!branchId) return rows
+  const { data, error } = await supabase
+    .from('branch_stock')
+    .select('product_id, stock_quantity')
+    .eq('branch_id', branchId)
+  if (error || !data) return rows
+  const byProduct = new Map(data.map(r => [r.product_id, r.stock_quantity]))
+  return rows.map(p => ({ ...p, stock_quantity: byProduct.get(p.id) ?? 0 }))
+}
+
 export default function POS() {
   const { profile, tenant } = useAuth()
+  const { branches, currentBranch, currentBranchId, setCurrentBranch, canSwitchBranch, isMultiBranch } = useBranch()
   const businessType = tenant?.business_type || 'hardware'
   // Phone products are detected from their vertical attributes so a phone-shop
   // product works correctly even if the tenant type is not set to 'phones'.
@@ -164,7 +181,9 @@ export default function POS() {
           await db.delete()
           location.reload()
         }
-        setProducts(data)
+        // The offline mirror deliberately keeps the tenant-wide totals; only the
+        // on-screen figures are narrowed to the selling branch.
+        setProducts(await applyBranchStock(data, currentBranchId))
         return
       }
     } catch (e) {
@@ -172,7 +191,7 @@ export default function POS() {
     }
     const localProducts = await db.products.toArray()
     setProducts(localProducts)
-  }, [])
+  }, [currentBranchId])
 
   // Mirror the full customer list into IndexedDB so phone lookup keeps working
   // offline. Tenant scoping is enforced server-side by RLS + get_my_tenant(),
@@ -493,6 +512,7 @@ export default function POS() {
       cashier_id: profile.id,
       type: 'pos',
       status: 'completed',
+      branch_id: currentBranchId || null,
       payment_method: paymentMethod,
       discount_total: parseFloat(discount) || 0,
       total_amount: totalAfterDiscount,
@@ -669,6 +689,42 @@ export default function POS() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Products area – takes 2 columns on large screens */}
         <div className="lg:col-span-2 space-y-4">
+          {/* Active branch. Owners of a multi-branch shop can move the till to
+              another branch; everyone else sees which branch they are ringing
+              up for. Single-branch shops still see the name but have nothing to
+              choose, so the control stays out of the way. */}
+          {currentBranch && (
+            <div className="flex items-center gap-3 flex-wrap">
+              <span className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-text-muted">
+                <Store className="h-4 w-4" />
+                Branch
+              </span>
+              {canSwitchBranch && isMultiBranch ? (
+                <select
+                  value={currentBranchId || ''}
+                  aria-label="Active branch"
+                  onChange={(e) => {
+                    setCurrentBranch(e.target.value)
+                    // Give focus back so the keyboard-wedge scanner, which
+                    // ignores keystrokes while a SELECT is focused, keeps working.
+                    e.target.blur()
+                  }}
+                  className="border border-border-dark rounded-lg px-3 py-1.5 text-sm bg-card focus:outline-none focus:ring-1 focus:ring-primary text-heading font-medium"
+                >
+                  {branches.map(b => (
+                    <option key={b.id} value={b.id}>
+                      {b.name}{b.is_head_office ? ' (Head office)' : ''}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-primary-soft text-primary-hover border border-primary-light">
+                  {currentBranch.name}
+                </span>
+              )}
+            </div>
+          )}
+
           {/* Search bar + camera scan */}
           <div className="flex gap-3">
             <div className="relative flex-1">
