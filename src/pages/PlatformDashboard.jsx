@@ -12,10 +12,13 @@ export default function PlatformDashboard() {
   const [metrics, setMetrics] = useState(null)
   const [tenants, setTenants] = useState([])
 
-  useEffect(() => {
+useEffect(() => {
     if (session && profile?.role === 'platform_admin') {
       ;(async () => {
-        const { data: mData, error: mErr } = await supabase.rpc('platform_metrics', {})
+        const { data: mData, error: mErr } = await supabase
+          .from('platform_metrics')
+          .select('*')
+          .single()
         if (!mErr && mData) {
           setMetrics(mData)
         }
