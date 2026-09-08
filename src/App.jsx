@@ -33,6 +33,7 @@ const ActivityLog = lazy(() => import('./pages/ActivityLog'))
 const AdminPayments = lazy(() => import('./pages/AdminPayments'))
 const Suppliers = lazy(() => import('./pages/Suppliers'))
 const Branches = lazy(() => import('./pages/Branches'))
+const PlatformDashboard = lazy(() => import('./pages/PlatformDashboard'))
 const StockTransfer = lazy(() => import('./pages/StockTransfer'))
 
 function PageFallback() {
@@ -197,6 +198,7 @@ function AppInner() {
             <Route path="/expenses" element={<PrivateRoute roleRequired="owner"><Expenses /></PrivateRoute>} />
             <Route path="/activity" element={<PrivateRoute roleRequired="owner"><ActivityLog /></PrivateRoute>} />
             <Route path="/admin/payments" element={<PrivateRoute roleRequired="platform_admin"><AdminPayments /></PrivateRoute>} />
+            <Route path="/admin/dashboard" element={<PrivateRoute roleRequired="platform_admin"><Suspense fallback={<PageFallback />}><PlatformDashboard /></Suspense></PrivateRoute>} />
             <Route path="/members" element={<PrivateRoute roleRequired="owner"><Members /></PrivateRoute>} />
             <Route path="/batch-management" element={<PrivateRoute roleRequired="owner"><BatchManagement /></PrivateRoute>} />
             <Route path="*" element={<Navigate to={isPlatformAdmin ? '/admin/payments' : '/pos'} />} />

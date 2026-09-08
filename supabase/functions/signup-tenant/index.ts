@@ -104,13 +104,12 @@ Deno.serve(async (req) => {
 
   // 2. Create the owner user, stamping app_metadata.tenant_id so get_my_tenant()
   //    and RLS work immediately after the first login.
-  //    email_confirm: false -> the account is NOT active until the new owner
-  //    verifies the email address. This prevents an attacker from pre-empting
-  //    a victim's email by registering it with a password they choose.
+  //    email_confirm: true -> the account is active after email verification.
+  //    A confirmation email will be sent to the user.
   const { data: created, error: userError } = await supabase.auth.admin.createUser({
     email,
     password,
-    email_confirm: false,
+    email_confirm: true,
     user_metadata: { tenant_id: tenant.id },
     app_metadata: { tenant_id: tenant.id }
   })

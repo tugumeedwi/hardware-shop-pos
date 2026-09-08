@@ -79,7 +79,10 @@ export default function Sidebar({ open, onClose, isOwner, isPlatformAdmin }) {
   if (isPlatformAdmin) {
     groups.push({
       label: 'PLATFORM',
-      items: [{ to: '/admin/payments', label: 'Admin Payments', icon: ShieldCheck }],
+      items: [
+        { to: '/admin/payments', label: 'Admin Payments', icon: ShieldCheck },
+        { to: '/admin/dashboard', label: 'Platform Dashboard', icon: LayoutDashboard },
+      ],
     })
   }
 
