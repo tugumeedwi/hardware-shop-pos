@@ -114,11 +114,18 @@ function PrivateRoute({ children, roleRequired }) {
   if (loading) return <div className="p-8">Loading...</div>
   if (!session) return <Navigate to="/login" />
 
-  // 'platform_admin' is a profile-level role. It also counts as an owner for
-  // tenant-owner routes so the platform admin keeps full shop-owner access,
-  // while roleRequired="platform_admin" stays exclusive to platform admins.
   const isPlatformAdmin = profile?.role === 'platform_admin'
   const membershipRole = tenant?.membership_role
+
+  // Platform admins can only access admin routes; redirect shop routes to /admin/dashboard
+  if (isPlatformAdmin && roleRequired !== 'platform_admin') {
+    return <Navigate to="/admin/dashboard" />
+  }
+
+  // Non-admins cannot access admin-protected routes
+  if (!isPlatformAdmin && roleRequired === 'platform_admin') {
+    return <Navigate to="/pos" />
+  }
 
   if (roleRequired === 'platform_admin') {
     if (!isPlatformAdmin) return <Navigate to="/pos" />

@@ -23,7 +23,55 @@ import {
   X,
 } from 'lucide-react'
 
-export default function Sidebar({ open, onClose, isOwner, isPlatformAdmin }) {
+export default function Sidebar({ open, onClose, isPlatformAdmin, isOwner: isOwnerProp }) {
+  const isOwner = isOwnerProp !== false
+
+  if (isPlatformAdmin) {
+    return (
+      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-5">
+        <div>
+          <p className="px-3 mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-sidebar-text/60">
+            PLATFORM
+          </p>
+          <div className="space-y-1">
+            <NavLink
+              key="/admin/dashboard"
+              to="/admin/dashboard"
+              end={false}
+              onClick={onClose}
+              className={({
+                isActive,
+              }) => `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                isActive
+                  ? 'bg-sidebar-active text-white shadow-sm'
+                  : 'text-sidebar-text hover:bg-sidebar-active/15 hover:text-white'
+              }`}
+            >
+              <LayoutDashboard className="h-4 w-4 shrink-0" />
+              <span>Platform Dashboard</span>
+            </NavLink>
+            <NavLink
+              key="/admin/payments"
+              to="/admin/payments"
+              end={false}
+              onClick={onClose}
+              className={({
+                isActive,
+              }) => `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                isActive
+                  ? 'bg-sidebar-active text-white shadow-sm'
+                  : 'text-sidebar-text hover:bg-sidebar-active/15 hover:text-white'
+              }`}
+            >
+              <ShieldCheck className="h-4 w-4 shrink-0" />
+              <span>Subscription Approvals</span>
+            </NavLink>
+          </div>
+        </div>
+      </nav>
+    )
+  }
+
   const groups = [
     {
       label: 'CORE',
@@ -74,16 +122,6 @@ export default function Sidebar({ open, onClose, isOwner, isPlatformAdmin }) {
         ],
       }
     )
-  }
-
-  if (isPlatformAdmin) {
-    groups.push({
-      label: 'PLATFORM',
-      items: [
-        { to: '/admin/payments', label: 'Admin Payments', icon: ShieldCheck },
-        { to: '/admin/dashboard', label: 'Platform Dashboard', icon: LayoutDashboard },
-      ],
-    })
   }
 
   const navClass = ({ isActive }) =>

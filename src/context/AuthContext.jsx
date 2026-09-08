@@ -255,6 +255,8 @@ export function AuthProvider({ children }) {
     return tenant
   }
 
+  const isPlatformAdmin = profile?.role === 'platform_admin'
+
   const value = {
     session,
     profile,
@@ -263,6 +265,7 @@ export function AuthProvider({ children }) {
     tenants,
     needsTenantSelection,
     isRecoverySession,
+    isPlatformAdmin,
     selectTenant,
     refreshTenant
   }
