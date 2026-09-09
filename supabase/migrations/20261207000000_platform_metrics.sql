@@ -47,25 +47,11 @@ group by t.id, t.name, t.subscription_status, t.plan_id, t.created_at;
 -- Grant select to authenticated users (RLS will filter by role)
 grant select on public.platform_tenant_summary to authenticated;
 
--- Row-level security: these views are restricted to platform_admin role only
--- The RLS policy checks the user's profile role
-create policy "platform_admin_metrics_view" on public.platform_metrics
-  using (
-    exists (
-      select 1 from public.profiles
-      where profiles.id = auth.uid()
-      and profiles.role = 'platform_admin'
-    )
-  );
-
-create policy "platform_admin_tenant_summary_view" on public.platform_tenant_summary
-  using (
-    exists (
-      select 1 from public.profiles
-      where profiles.id = auth.uid()
-      and profiles.role = 'platform_admin'
-    )
-  );
+-- Access control moved to the SECURITY DEFINER functions platform_metrics()
+-- and platform_tenant_summary() (see 20261209000000): PostgreSQL does not
+-- support CREATE POLICY on views, so the statements that stood here were
+-- removed -- they abort `supabase db push` with "cannot create policy on a
+-- view". The views themselves are dropped by 20261209000000.
 
 -- Add comments
 comment on view public.platform_metrics is 'High-level platform metrics for CEO dashboard (platform_admin only)';

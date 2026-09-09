@@ -41,8 +41,8 @@ export default function Dashboard() {
       setExpensesTotal(summary.expenses_total || 0)
     }
 
-    // Fetch sales by category
-    const { data: catData } = await supabase.rpc('v_sales_by_category')
+    // v_sales_by_category is a view, not an RPC function: query via .from().
+    const { data: catData } = await supabase.from('v_sales_by_category').select('*')
     if (catData) {
       setSalesByCategory(catData)
     }

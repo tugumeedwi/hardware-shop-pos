@@ -15,22 +15,14 @@ export default function PlatformDashboard() {
 useEffect(() => {
     if (session && profile?.role === 'platform_admin') {
       ;(async () => {
-        const { data: mData, error: mErr } = await supabase
-          .from('platform_metrics')
-          .select('*')
-          .single()
+        // platform_metrics() is a SECURITY DEFINER function that raises
+        // unless the caller is a platform admin; it returns one JSON object.
+        const { data: mData, error: mErr } = await supabase.rpc('platform_metrics')
         if (!mErr && mData) {
           setMetrics(mData)
         }
-        const { data: tData, error: tErr } = await supabase
-          .from('tenants')
-          .select(`
-            id,
-            name,
-            subscription_status,
-            plan_id,
-            created_at
-          `)
+        // Per-tenant aggregates come from the sibling admin-only function.
+        const { data: tData, error: tErr } = await supabase.rpc('platform_tenant_summary')
         if (!tErr && tData) {
           setTenants(tData)
         }
@@ -113,11 +105,11 @@ useEffect(() => {
               <tbody>
                 {tenants.map((tenant) => {
                   return (
-                    <tr key={tenant.id}>
-                      <td className="font-medium text-text">{tenant.name}</td>
-                      <td className="text-text"></td>
-                      <td className="text-text"></td>
-                      <td className="text-text"></td>
+                    <tr key={tenant.tenant_id || tenant.id}>
+                      <td className="font-medium text-text">{tenant.tenant_name || tenant.name}</td>
+                      <td className="text-text">{tenant.branches_count ?? ''}</td>
+                      <td className="text-text">{tenant.employees_count ?? ''}</td>
+                      <td className="text-text">{tenant.customers_count ?? ''}</td>
                       <td className="text-text">{tenant.subscription_status}</td>
                       <td className="text-text">
                         {PLANS.find(p => p.value === tenant.plan_id)?.label || tenant.plan_id}

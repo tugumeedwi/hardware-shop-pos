@@ -30,8 +30,10 @@
     verify_jwt = true
   [functions.list-pending-payment-requests]
     verify_jwt = true
-  [functions.public-api]
-    verify_jwt = false        # Public API endpoint, uses API key auth
+  # NOTE: the public-api developer-platform function was removed (audit):
+  # its handler was a Hono Node-server app that cannot run on the Deno edge
+  # runtime, nothing mints api_keys, and no frontend/tests call it. The
+  # api_keys table + RLS stay in place for a future implementation.
 
 [auth]
 site_url = "https://saleshub-pos.netlify.app"

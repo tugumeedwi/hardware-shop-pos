@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../api/supabaseClient'
 import { useAuth } from '../context/AuthContext'
 
@@ -19,7 +19,7 @@ export default function Reports() {
     to: new Date()
   })
 
-  const fetchReports = useCallback(async () => {
+  const fetchReports = async () => {
     if (!tenant?.id) return
     try {
       const { data: summary, error: summaryError } = await supabase
@@ -29,6 +29,8 @@ export default function Reports() {
         .lte('created_at', dateRange.to.toISOString())
         .eq('tenant_id', tenant.id)
         .eq('status', 'completed')
+        .order('created_at', { ascending: false })
+        .limit(5000)
 
       if (summaryError) throw summaryError
 
@@ -45,19 +47,20 @@ export default function Reports() {
         .sort((a, b) => a[0].localeCompare(b[0]))
         .map(([date, total]) => ({ date, total }))
 
-      const { data: catData, error: catError } = await supabase.rpc('v_sales_by_category')
+      // Reporting views are PostgREST tables, not RPC functions: query via .from().
+      const { data: catData, error: catError } = await supabase.from('v_sales_by_category').select('*')
       if (catError) throw catError
       const salesByCategory = catData || []
 
-      const { data: invData, error: invError } = await supabase.rpc('v_inventory_valuation')
+      const { data: invData, error: invError } = await supabase.from('v_inventory_valuation').select('*')
       if (invError) throw invError
       const inventoryValuation = invData || []
 
-      const { data: creditData, error: creditError } = await supabase.rpc('v_credit_outstanding')
+      const { data: creditData, error: creditError } = await supabase.from('v_credit_outstanding').select('*')
       if (creditError) throw creditError
       const creditOutgoing = creditData || []
 
-      const { data: empData, error: empError } = await supabase.rpc('v_employee_sales')
+      const { data: empData, error: empError } = await supabase.from('v_employee_sales').select('*')
       if (empError) throw empError
       const employeeSales = empData || []
 
@@ -74,7 +77,14 @@ export default function Reports() {
     } finally {
       setLoading(false)
     }
-  }, [tenant?.id])
+  }
+
+  // Initial + refetch on tenant/range change (deferred so the effect body
+  // itself never calls setState synchronously).
+  useEffect(() => {
+    const t = setTimeout(fetchReports, 0)
+    return () => clearTimeout(t)
+  }, [tenant?.id, dateRange.from, dateRange.to])
 
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center p-8">Loading reports…</div>
@@ -127,7 +137,6 @@ export default function Reports() {
                     from: new Date(e.target.value),
                     to: dateRange.to
                   })
-                  fetchReports()
                 }}
                 className="border border-border-dark rounded-xl px-4 py-2 bg-card w-full focus:outline-none focus:ring-primary"
               />
@@ -142,7 +151,6 @@ export default function Reports() {
                     from: dateRange.from,
                     to: new Date(e.target.value)
                   })
-                  fetchReports()
                 }}
                 className="border border-border-dark rounded-xl px-4 py-2 bg-card w-full focus:outline-none focus:ring-primary"
               />
