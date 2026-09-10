@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../api/supabaseClient'
 import { useAuth } from '../context/AuthContext'
 
@@ -19,7 +19,7 @@ export default function Reports() {
     to: new Date()
   })
 
-  const fetchReports = async () => {
+  const fetchReports = useCallback(async () => {
     if (!tenant?.id) return
     try {
       const { data: summary, error: summaryError } = await supabase
@@ -77,14 +77,14 @@ export default function Reports() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [tenant, dateRange])
 
   // Initial + refetch on tenant/range change (deferred so the effect body
   // itself never calls setState synchronously).
   useEffect(() => {
     const t = setTimeout(fetchReports, 0)
     return () => clearTimeout(t)
-  }, [tenant?.id, dateRange.from, dateRange.to])
+  }, [fetchReports])
 
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center p-8">Loading reports…</div>

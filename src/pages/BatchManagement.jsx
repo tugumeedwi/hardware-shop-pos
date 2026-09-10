@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../api/supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import { useBranch } from '../context/BranchContext'
@@ -17,7 +17,7 @@ export default function BatchManagement() {
   const [batchQuantity, setBatchQuantity] = useState(0)
   const { currentBranch } = useBranch()
 
-  const fetchProducts = async () => {
+  const fetchProducts = useCallback(async () => {
     if (!tenant?.id) return
     const { data, error } = await supabase
       .from('products')
@@ -30,9 +30,9 @@ export default function BatchManagement() {
       return toast.error('Failed to load products')
     }
     setProducts(data || [])
-  }
+  }, [tenant])
 
-  const fetchBatches = async (pid) => {
+  const fetchBatches = useCallback(async (pid) => {
     if (!tenant?.id) return
     try {
       const { data, error } = await supabase
@@ -50,7 +50,7 @@ export default function BatchManagement() {
       console.error('Failed to fetch batches:', err)
       return toast.error('Failed to load batches')
     }
-  }
+  }, [tenant, currentBranch])
 
   const handleBatchSubmit = async (e, pid) => {
     e.preventDefault()

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../api/supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
@@ -9,7 +9,7 @@ export default function Members() {
   const [branches, setBranches] = useState([])
   const [updating, setUpdating] = useState(new Map())
 
-  const fetchMembers = async () => {
+  const fetchMembers = useCallback(async () => {
     if (!tenant?.id) return
     const { data, error } = await supabase
       .from('tenant_memberships')
@@ -28,9 +28,9 @@ export default function Members() {
       return toast.error('Failed to load members')
     }
     setMembers(data || [])
-  }
+  }, [tenant])
 
-  const fetchBranches = async () => {
+  const fetchBranches = useCallback(async () => {
     if (!tenant?.id) return
     const { data, error } = await supabase
       .from('branches')
@@ -43,7 +43,7 @@ export default function Members() {
       return toast.error('Failed to load branches')
     }
     setBranches(data || [])
-  }
+  }, [tenant])
 
   useEffect(() => {
     const t = setTimeout(fetchMembers, 0)
