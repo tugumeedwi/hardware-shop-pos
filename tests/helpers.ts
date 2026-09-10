@@ -1,4 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
+import ws from 'ws'
 import { Page, expect } from '@playwright/test'
 import * as fs from 'fs'
 import * as path from 'path'
@@ -66,7 +67,11 @@ export interface TestData {
 
 export function serviceClient(): SupabaseClient {
   assertEnv()
-  return createClient(SUPABASE_URL, SERVICE_KEY)
+  // Explicit WebSocket transport so the realtime client initializes on any
+  // Node version (Node 20 has no native WebSocket).
+  return createClient(SUPABASE_URL, SERVICE_KEY, {
+    realtime: { transport: ws as any }
+  })
 }
 
 export function loadTestData(): TestData {
