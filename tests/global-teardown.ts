@@ -14,9 +14,10 @@ import 'dotenv/config'
 // ---------------------------------------------------------------------------
 
 const CHILD_TABLES = [
-  // Accounting children first: lines -> entries -> accounts (the lines'
-  // tenant_id FK carries no cascade, so explicit deletes must precede the
-  // tenant delete or it is blocked).
+  // Children before parents throughout: dependencies (lines -> entries,
+  // return_items -> sales_returns, transfer items -> transfers, items ->
+  // sales -> products/customers) must go first so FK constraints never block
+  // the deletes, regardless of CASCADE coverage.
   'journal_entry_lines',
   'journal_entries',
   'chart_of_accounts',
@@ -46,12 +47,56 @@ const CHILD_TABLES = [
   'sync_conflict_log'
 ]
 
+const RETRY_ATTEMPTS = 3
+const RETRY_DELAY_MS = 1000
+// Overall teardown budget (120s): bounds the retry loops above so a
+// persistently failing backend fails fast instead of hanging the run.
+const TEARDOWN_BUDGET_MS = 120_000
+
+async function retry<T>(label: string, fn: () => Promise<T>): Promise<T> {
+  let lastErr: unknown = new Error('no attempts made')
+  for (let attempt = 1; attempt <= RETRY_ATTEMPTS; attempt++) {
+    try {
+      return await fn()
+    } catch (e) {
+      lastErr = e
+      if (attempt < RETRY_ATTEMPTS) {
+        console.warn(`[global-teardown] ${label} attempt ${attempt} failed, retrying…`)
+        await new Promise((r) => setTimeout(r, RETRY_DELAY_MS))
+      }
+    }
+  }
+  throw lastErr
+}
+
+function checkBudget(startedAt: number): void {
+  if (Date.now() - startedAt > TEARDOWN_BUDGET_MS) {
+    throw new Error('[global-teardown] exceeded 120s teardown budget, aborting')
+  }
+}
+
+// Supabase deletes resolve (not reject) on error, so translate a returned
+// error into a throw to engage the retry loop.
+async function deleteRows(
+  svc: SupabaseClient,
+  table: string,
+  column: string,
+  value: string,
+  label: string
+): Promise<void> {
+  await retry(`${table} delete for ${label}`, async () => {
+    const { error } = await svc.from(table as any).delete().eq(column, value)
+    if (error) throw new Error(error.message)
+  })
+}
+
 export default async function globalTeardown() {
   if (!testDataExists()) {
     console.log('[global-teardown] no test data to clean up')
     return
   }
   assertEnv()
+  const startedAt = Date.now()
   const svc = serviceClient()
   const data = loadTestData()
 
@@ -80,23 +125,59 @@ export default async function globalTeardown() {
     data.platformAdmin?.user_id
   ].filter(Boolean)
 
+  let deletedTenants = 0
+  let deletedUsers = 0
+  const failedTenantIds: string[] = []
+  const failedUserIds: string[] = []
+
   for (const tid of tenantIds) {
+    let tenantOk = true
     for (const table of CHILD_TABLES) {
       try {
-        await svc.from(table as any).delete().eq('tenant_id', tid)
+        await deleteRows(svc, table, 'tenant_id', tid, tid)
       } catch (e) {
-        console.warn(`[global-teardown] skip delete ${table} for ${tid}: ${(e as Error).message}`)
+        tenantOk = false
+        console.warn(`[global-teardown] FAILED delete ${table} for ${tid}: ${(e as Error).message}`)
       }
+      checkBudget(startedAt)
     }
-    const { error } = await svc.from('tenants').delete().eq('id', tid)
-    if (error) console.warn(`[global-teardown] tenant delete ${tid}: ${error.message}`)
+    try {
+      await deleteRows(svc, 'tenants', 'id', tid, tid)
+    } catch (e) {
+      tenantOk = false
+      console.warn(`[global-teardown] FAILED tenant delete ${tid}: ${(e as Error).message}`)
+    }
+    if (tenantOk) {
+      deletedTenants += 1
+    } else {
+      failedTenantIds.push(tid as string)
+    }
+    checkBudget(startedAt)
   }
 
   for (const uid of userIds) {
-    const { error } = await svc.auth.admin.deleteUser(uid)
-    if (error) console.warn(`[global-teardown] user delete ${uid}: ${error.message}`)
+    try {
+      await retry(`user delete ${uid}`, async () => {
+        const { error } = await svc.auth.admin.deleteUser(uid as string)
+        if (error) throw new Error(error.message)
+      })
+      deletedUsers += 1
+    } catch (e) {
+      failedUserIds.push(uid as string)
+      console.warn(`[global-teardown] FAILED user delete ${uid}: ${(e as Error).message}`)
+    }
+    checkBudget(startedAt)
   }
 
   deleteTestDataFile()
-  console.log(`[global-teardown] cleaned up ${tenantIds.length} tenants and ${userIds.length} users`)
+
+  const attempted = tenantIds.length + userIds.length
+  const deleted = deletedTenants + deletedUsers
+  if (deleted !== attempted) {
+    throw new Error(
+      `[global-teardown] incomplete cleanup: deleted ${deleted}/${attempted}. ` +
+      `failed tenants: [${failedTenantIds.join(', ')}]; failed users: [${failedUserIds.join(', ')}]`
+    )
+  }
+  console.log(`[global-teardown] cleaned up ${deletedTenants} tenants and ${deletedUsers} users`)
 }

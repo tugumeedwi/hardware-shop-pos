@@ -48,6 +48,14 @@ Built as an offline-first PWA using React + Supabase.
    - Support IMEI scanning (15-17 digit serial)
    - Hide unit selection for phone products; always piece-based
 
+## Deployment
+- Database migrations in `supabase/migrations/` are applied via GitHub Actions
+  (`.github/workflows/supabase-migrations.yml`), never with local
+  `supabase db push` (the sandbox SIGKILLs it).
+- Supabase Dashboard / secret settings require manual configuration — see
+  `docs/SECURITY-SETUP.md`.
+- E2E runs via `.github/workflows/tests.yml` (`npm ci`, lint, build, Playwright).
+
 ## Coding Standards
 - All data access via Supabase client (never raw SQL from frontend).
 - Offline writes go through IndexedDB syncQueue.
