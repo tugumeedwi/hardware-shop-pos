@@ -14,6 +14,17 @@ import 'dotenv/config'
 // ---------------------------------------------------------------------------
 
 const CHILD_TABLES = [
+  // Accounting children first: lines -> entries -> accounts (the lines'
+  // tenant_id FK carries no cascade, so explicit deletes must precede the
+  // tenant delete or it is blocked).
+  'journal_entry_lines',
+  'journal_entries',
+  'chart_of_accounts',
+  'loyalty_redemptions',
+  'loyalty_points',
+  'currencies',
+  'product_batches',
+  'api_keys',
   'payment_requests',
   'tax_invoices',
   'credit_transactions',
