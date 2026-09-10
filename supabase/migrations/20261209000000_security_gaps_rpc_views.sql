@@ -526,7 +526,7 @@ select
   p.category,
   count(si.id) as items_sold,
   coalesce(sum(si.line_total), 0) as revenue,
-  coalesce(sum(si.line_total) * coalesce(p.tax_rate, 0) / 100, 0) as tax_amount
+  coalesce(sum(si.line_total * coalesce(p.tax_rate, 0) / 100), 0) as tax_amount
 from public.sale_items si
 join public.products p on si.product_id = p.id and p.tenant_id = si.tenant_id
 join public.sales s on si.sale_id = s.id and s.tenant_id = p.tenant_id and s.status = 'completed'

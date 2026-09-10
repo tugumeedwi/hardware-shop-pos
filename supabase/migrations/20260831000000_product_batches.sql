@@ -123,6 +123,7 @@ select pb.id::uuid
   where pb.product_id = p_product_id
     and pb.branch_id = p_branch_id
   order by pb.expiry_date asc, pb.created_at asc;
+$$;
 
 grant execute on function public.get_batches_by_product_branch(uuid, uuid) to authenticated;
 
@@ -138,10 +139,11 @@ language sql
 stable
 security definer
 set search_path = public
-as
+as $$
   select coalesce(sum(pb.quantity), 0)
     from public.product_batches pb
    where pb.branch_id = p_branch_id
      and pb.product_id = p_product_id;
+$$;
 
 grant execute on function public.total_batch_qty(uuid, uuid) to authenticated;

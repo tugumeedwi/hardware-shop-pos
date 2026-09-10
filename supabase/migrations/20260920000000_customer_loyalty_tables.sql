@@ -31,7 +31,8 @@ grant select, insert, update on public.loyalty_points to authenticated;
 grant select, insert on public.loyalty_redemptions to authenticated;
 
 -- Add RLS policies
-alter table public.loyalty_enabled force row level security;
+alter table public.loyalty_points force row level security;
+alter table public.loyalty_redemptions force row level security;
 
 create policy "loyalty_points_tenant_isolation" on public.loyalty_points
   for all using (tenant_id = public.get_my_tenant());

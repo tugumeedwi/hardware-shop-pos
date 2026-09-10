@@ -123,7 +123,8 @@ alter function public.my_branch_id() set search_path = public;
 alter function public.products_sync_batch_stock() set search_path = public;
 alter function public.get_batches_by_product_branch(uuid, uuid) set search_path = public;
 alter function public.total_batch_qty(uuid, uuid) set search_path = public;
-alter function public.seed_default_accounts() set search_path = public;
+-- NOTE: seed_default_accounts() is created later (20260922000000, which already
+-- declares SET search_path = public), so it is intentionally not altered here.
 
 -- ----------------------------------------------------------------------------
 -- 3. REVOKE EXECUTE FROM anon on all SECURITY DEFINER functions.
@@ -166,7 +167,9 @@ revoke execute on function public.my_branch_id() from anon;
 revoke execute on function public.products_sync_batch_stock() from anon;
 revoke execute on function public.get_batches_by_product_branch(uuid, uuid) from anon;
 revoke execute on function public.total_batch_qty(uuid, uuid) from anon;
-revoke execute on function public.seed_default_accounts() from anon;
+-- NOTE: seed_default_accounts() does not exist yet at this point in the chain
+-- (created by 20260922000000); it is trigger-only and never granted, so no
+-- revoke is needed here.
 
 -- ----------------------------------------------------------------------------
 -- 4. REVOKE FROM authenticated -- DENY LIST ONLY (not a blanket revoke).
@@ -228,7 +231,7 @@ revoke execute on function public.branches_guard_delete() from authenticated;
 revoke execute on function public.products_sync_branch_stock() from authenticated;
 revoke execute on function public.memberships_validate_branch() from authenticated;
 revoke execute on function public.products_sync_batch_stock() from authenticated;
-revoke execute on function public.seed_default_accounts() from authenticated;
+-- NOTE: seed_default_accounts() does not exist yet (see above); skipping.
 -- check_signup_rate_limit was already revoked in 20260814050000; re-assert:
 revoke execute on function public.check_signup_rate_limit(text) from public, anon, authenticated;
 

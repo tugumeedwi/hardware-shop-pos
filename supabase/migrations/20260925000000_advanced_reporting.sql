@@ -5,6 +5,12 @@
 -- These are materialized views or regular views returning aggregated data.
 -- ============================================================================
 
+-- The reporting views and the Reports/Dashboard pages read sales.tax_amount,
+-- but no earlier migration created the column (it fails the push otherwise).
+alter table public.sales
+  add column if not exists tax_amount numeric not null default 0;
+update public.sales set tax_amount = coalesce(tax_amount, 0) where tax_amount is null;
+
 -- Sales summary by date range view
 create or replace view public.v_sales_summary as
 select
@@ -40,7 +46,7 @@ select
   p.category,
   count(si.id) as items_sold,
   coalesce(sum(si.line_total), 0) as revenue,
-  coalesce(sum(si.line_total) * coalesce(p.tax_rate, 0) / 100, 0) as tax_amount
+  coalesce(sum(si.line_total * coalesce(p.tax_rate, 0) / 100), 0) as tax_amount
 from public.sale_items si
 join public.products p on si.product_id = p.id and p.tenant_id = si.tenant_id
 join public.sales s on si.sale_id = s.id and s.tenant_id = p.tenant_id and s.status = 'completed'

@@ -8,13 +8,17 @@
 -- Create currencies table
 create table if not exists public.currencies (
   id uuid primary key default gen_random_uuid(),
-  code text unique not null,        -- e.g., 'UGX','KES','USD'
+  tenant_id uuid references public.tenants(id) on delete cascade,
+  code text not null,        -- e.g., 'UGX','KES','USD'
   name text not null,              -- e.g., 'Ugandan Shilling'
   symbol text not null,            -- e.g., 'Sh', '$'
   exchange_rate_to_base numeric default 1.0,  -- relative to tenant's base currency
   is_default boolean default false,
-  created_at timestamptz default now()
+  created_at timestamptz default now(),
+  unique (tenant_id, code)
 );
+
+create index if not exists idx_currencies_tenant on public.currencies (tenant_id);
 
 -- Add currency_code column to tenants (default 'UGX')
 alter table public.tenants
