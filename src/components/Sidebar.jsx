@@ -64,7 +64,7 @@ export default function Sidebar({ open, onClose, isPlatformAdmin, isOwner: isOwn
               }`}
             >
               <ShieldCheck className="h-4 w-4 shrink-0" />
-              <span>Subscription Approvals</span>
+              <span>Admin Payments</span>
             </NavLink>
           </div>
         </div>
